@@ -8,7 +8,6 @@
 #include <unistd.h>
 
 #include "common.h"
-#include "proto.h"
 #include "serialize.h"
 
 int serialize_employee(employee *e, unsigned char **buf, size_t *buf_len)
@@ -82,8 +81,10 @@ int deserialize_employee(employee *e, unsigned char *buf, size_t *buf_len)
 
 int fserialize_employee(int fd, employee *e)
 {
+    // add 1 to record the length of the null terminator
     uint16_t name_len = strlen(e->name) + 1;
     uint16_t serialized_name_len = htons(name_len);
+
     // write serialized name length to file
     if (write(fd, &serialized_name_len, sizeof(uint16_t)) == -1)
     {
@@ -100,6 +101,7 @@ int fserialize_employee(int fd, employee *e)
 
     uint16_t address_len = strlen(e->address) + 1;
     uint16_t serialized_address_len = htons(address_len);
+
     // write serialized address length to file
     if (write(fd, &serialized_address_len, sizeof(uint16_t)) == -1)
     {
@@ -115,8 +117,9 @@ int fserialize_employee(int fd, employee *e)
     }
 
     uint32_t hours = htonl(e->hours);
+
     // write serialized hours to database file
-    if (write(fd, hours, sizeof(uint32_t)) == -1)
+    if (write(fd, &hours, sizeof(uint32_t)) == -1)
     {
         fprintf(stderr, "%s:%s:%d - error writing hours to database file: (%d) %s\n", __FILE__, __FUNCTION__, __LINE__, errno, strerror(errno));
         return STATUS_ERROR;
@@ -126,7 +129,7 @@ int fserialize_employee(int fd, employee *e)
 }
 
 
-int fdeserialize_employee(int fd, employee **e)
+int fdeserialize_employee(int fd, employee *e)
 {
     // deserialize name
     uint16_t name_len;
@@ -138,6 +141,7 @@ int fdeserialize_employee(int fd, employee **e)
     
     // convert back to host endianess
     name_len = ntohs(name_len);
+
     // read name from file
     char *name = malloc(name_len);
     if (read(fd, name, name_len) != name_len)
@@ -150,12 +154,13 @@ int fdeserialize_employee(int fd, employee **e)
     uint16_t address_len;
     if (read(fd, &address_len, sizeof(uint16_t)) != sizeof(uint16_t))
     {
-        fpritnf(stderr, "%s:%s:%d - error reading address length from database file: (%d) %s\n", __FILE__, __FUNCTION__, __LINE__, errno, strerror(errno));
+        fprintf(stderr, "%s:%s:%d - error reading address length from database file: (%d) %s\n", __FILE__, __FUNCTION__, __LINE__, errno, strerror(errno));
         return STATUS_ERROR;
     }
 
     // convert back to host endianess
     address_len = ntohs(address_len);
+
     // read address from file
     char *address = malloc(address_len); 
     if (read(fd, address, address_len) != address_len)
@@ -169,18 +174,46 @@ int fdeserialize_employee(int fd, employee **e)
     uint32_t hours;
     if (read(fd, &hours, sizeof(uint32_t)) != sizeof(uint32_t))
     {
-        fprintf(stderr, "%s:%s:%d - error reading hours from database file: (%d) %s\n", __FILE__, FUNCTION__, __LINE__, errno, strerror(errno));
+        fprintf(stderr, "%s:%s:%d - error reading hours from database file: (%d) %s\n", __FILE__, __FUNCTION__, __LINE__, errno, strerror(errno));
         return STATUS_ERROR;
     }
 
     hours = ntohl(hours);
 
     // construct employee
-    (*e)->name = name;
-    (*e)->address = address;
-    (*e)->hours = hours;
+    e->name = name;
+    e->address = address;
+    e->hours = hours;
     return STATUS_SUCCESS;
 }
+
+int write_new_file_hdr(int fd)
+{
+    db_header hdr = (db_header) { .fsize=htonl(sizeof(db_header)), .employee_count=htonl(0) };
+    int status;
+    if ((status = write(fd, (void*)&hdr, sizeof(db_header))) == -1)
+    {
+        fprintf(stderr, "%s:%s:%d - unable to write new database header to file: (%d) %s\n", __FILE__, __FUNCTION__, __LINE__, errno, strerror(errno));
+        return STATUS_ERROR;
+    }
+
+    return STATUS_SUCCESS;
+}
+    
+int read_employees(int fd, employee **employees, size_t employees_size)
+{
+    for (size_t i = 0; i < employees_size; i++)
+    {
+        if (fdeserialize_employee(fd, *employees + i) == STATUS_ERROR)  
+            return STATUS_ERROR;
+    }
+    
+    return STATUS_SUCCESS;
+}
+
+
+ 
+    
 
 
 
