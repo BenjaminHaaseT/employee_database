@@ -4,11 +4,30 @@
 #include <errno.h>
 #include <stdint.h>
 #include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include <sys/uio.h>
 #include <unistd.h>
+#include <arpa/inet.h>
 
 #include "common.h"
 #include "serialize.h"
+
+int write_all(int fd, void *buf, size_t buf_size)
+{
+    size_t total = 0;
+    while (total < buf_size)
+    {
+        int n_bytes = write(fd, buf + total, buf_size - total);
+        if (n_bytes == -1)
+        {
+            fprintf(stderr, "%s:%s:%d error writing bytes to file descriptor: (%d) %s\n", __FILE__, __FUNCTION__, __LINE__, errno, strerror(errno));
+            return STATUS_ERROR;
+        }
+        total += n_bytes;
+    }
+    return total;
+}
 
 int serialize_employee(employee *e, unsigned char **buf, size_t *buf_len)
 {
@@ -85,47 +104,57 @@ int fserialize_employee(int fd, employee *e)
     uint16_t name_len = strlen(e->name) + 1;
     uint16_t serialized_name_len = htons(name_len);
 
+    // keep track of total bytes written for current employee
+    int total_bytes = 0;
+    int nbytes = 0;
+
     // write serialized name length to file
-    if (write(fd, &serialized_name_len, sizeof(uint16_t)) == -1)
+    if ((nbytes = write_all(fd, &serialized_name_len, sizeof(uint16_t))) == STATUS_ERROR)
     {
         fprintf(stderr, "%s:%s:%d - error writing name length to database file: (%d) %s\n", __FILE__, __FUNCTION__, __LINE__, errno, strerror(errno));
         return STATUS_ERROR;
     }
+    total_bytes += nbytes;
 
     // write name to file
-    if (write(fd, e->name, name_len) == -1)
+    if ((nbytes = write_all(fd, e->name, name_len)) == STATUS_ERROR)
     {
         fprintf(stderr, "%s:%s:%d - error writing name to database file: (%d) %s\n", __FILE__, __FUNCTION__, __LINE__, errno, strerror(errno));
         return STATUS_ERROR;
     }
+    total_bytes += nbytes;
 
     uint16_t address_len = strlen(e->address) + 1;
     uint16_t serialized_address_len = htons(address_len);
 
     // write serialized address length to file
-    if (write(fd, &serialized_address_len, sizeof(uint16_t)) == -1)
+    if ((nbytes = write_all(fd, &serialized_address_len, sizeof(uint16_t))) == STATUS_ERROR)
     {
         fprintf(stderr, "%s:%s:%d - error writing address length to database file: (%d) %s\n", __FILE__, __FUNCTION__, __LINE__, errno, strerror(errno));
         return STATUS_ERROR;
     }
+    total_bytes += nbytes;
+
 
     // write address to file
-    if (write(fd, e->address, address_len) == -1)
+    if ((nbytes = write_all(fd, e->address, address_len)) == STATUS_ERROR)
     {
         fprintf(stderr, "%s:%s:%d - error writing address to database file: (%d) %s\n", __FILE__, __FUNCTION__, __LINE__, errno, strerror(errno));
         return STATUS_ERROR;
     }
+    total_bytes += nbytes;
 
     uint32_t hours = htonl(e->hours);
 
     // write serialized hours to database file
-    if (write(fd, &hours, sizeof(uint32_t)) == -1)
+    if ((nbytes = write_all(fd, &hours, sizeof(uint32_t))) == STATUS_ERROR)
     {
         fprintf(stderr, "%s:%s:%d - error writing hours to database file: (%d) %s\n", __FILE__, __FUNCTION__, __LINE__, errno, strerror(errno));
         return STATUS_ERROR;
     }
+    total_bytes += nbytes;
 
-    return STATUS_SUCCESS;
+    return total_bytes;
 }
 
 
@@ -199,7 +228,23 @@ int write_new_file_hdr(int fd)
 
     return STATUS_SUCCESS;
 }
-    
+
+int write_employees(int fd, employee *employees, size_t employees_size)
+{
+    size_t total_bytes = 0;
+    int nbytes = 0;
+    for (size_t i = 0; i < employees_size; i++)
+    {
+        if ((nbytes = fserialize_employee(fd, employees + i)) == STATUS_ERROR)
+        {
+            fprintf(stderr, "%s:%s:%d unable to write employee to database file: (%d) %s\n", __FILE__, __FUNCTION__, __LINE__, errno, strerror(errno));
+            return STATUS_ERROR;
+        }
+        total_bytes += nbytes;
+    }
+    return total_bytes;
+}
+
 int read_employees(int fd, employee **employees, size_t employees_size)
 {
     for (size_t i = 0; i < employees_size; i++)
@@ -211,9 +256,31 @@ int read_employees(int fd, employee **employees, size_t employees_size)
     return STATUS_SUCCESS;
 }
 
+int read_dbhdr(int fd, db_header *dbhdr)
+{
 
- 
-    
+    // Read database file header and stats from file
+    if (read(fd, dbhdr, sizeof(db_header)) == -1)
+    {
+        fprintf(stderr, "%s:%s:%d - unable to read database header from file: (%d) %s\n", __FILE__, __FUNCTION__, __LINE__,  errno, strerror(errno));
+        return STATUS_ERROR;
+    }
 
+    // Read stats from file, check file sizes in bytes match
+    dbhdr->fsize = ntohl(dbhdr->fsize);
+    dbhdr->employee_count = ntohl(dbhdr->employee_count);
+    struct stat s;
+    if (fstat(fd, &s) == -1)
+    {
+        fprintf(stderr, "%s:%s:%d - unable to read stats for file: (%d) %s\n", __FILE__, __FUNCTION__, __LINE__, errno, strerror(errno));
+        return STATUS_ERROR;
+    }
 
+    if (s.st_size != dbhdr->fsize)
+    {
+        fprintf(stderr, "%s:%s:%d - corrupted data, header file size does not match stat size: header file size = %u, stats file size = %zu\n", __FILE__, __FUNCTION__, __LINE__, dbhdr->fsize, s.st_size);
+        return STATUS_ERROR;
+    }
+    return STATUS_SUCCESS;
+}
 

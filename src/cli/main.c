@@ -97,30 +97,41 @@ int main(int argc, char *argv[])
     
     // Read database file header and stats from file
     db_header dbhdr;
-    if (read(fd, &dbhrd, sizeof(db_header)) == -1)
+    if(read_dbhdr(fd, &dbhdr) == STATUS_ERROR)
     {
-        fprintf(stderr, "%s:%s:%d - unable to read database header from file %s: (%d) %s\n", __FILE__, __FUNCTION__, __LINE__, fname, errno, strerror(errno));
-        exit(1);
-    }
-    // Read stats from file, check file sizes in bytes match
-    dbhdr.fsize = ntohl(dbhdr.fsize);
-    dbhdr.employee_count = ntohl(dbhdr.employee_count);
-    struct stat;
-    if (fstat(fd, &stat) == -1)
-    {
-        fprintf(stderr, "%s:%s:%d - unable to read stats for file %s: (%d) %s\n", __FILE__, __FUNCTION__, __LINE__, fname, errno, strerror(errno));
-        exit(1);
-    }
-
-    if (stat.st_size != dbhdr.fsize)
-    {
-        fprintf(stderr, "%s:%s:%d - corrupted data, header file size does not match stat size: header file size = %zu, stats file size = %zu\n", __FILE__, __FUNCTION__, __LINE__, dbhdr.fsize, stat.st_size);
         exit(1);
     }
 
     // Read employees from data base
-    employee *employees;
     size_t employees_size = dbhdr.employee_count;      
+    employee *employees = (employee *) malloc(sizeof(employee) * employees_size);
+    if (read_employees(fd, &employees, employees_size) == STATUS_ERROR)
+    {
+        exit(1);
+    }
+
+
+//    if (read(fd, &dbhrd, sizeof(db_header)) == -1)
+ //   {
+ //       fprintf(stderr, "%s:%s:%d - unable to read database header from file %s: (%d) %s\n", __FILE__, __FUNCTION__, __LINE__, fname, errno, strerror(errno));
+ //       exit(1);
+ //   }
+ //   // Read stats from file, check file sizes in bytes match
+ //   dbhdr.fsize = ntohl(dbhdr.fsize);
+ //   dbhdr.employee_count = ntohl(dbhdr.employee_count);
+ //   struct stat;
+ //   if (fstat(fd, &stat) == -1)
+ //   {
+ //       fprintf(stderr, "%s:%s:%d - unable to read stats for file %s: (%d) %s\n", __FILE__, __FUNCTION__, __LINE__, fname, errno, strerror(errno));
+ //       exit(1);
+ //   }
+
+ //   if (stat.st_size != dbhdr.fsize)
+ //   {
+ //       fprintf(stderr, "%s:%s:%d - corrupted data, header file size does not match stat size: header file size = %zu, stats file size = %zu\n", __FILE__, __FUNCTION__, __LINE__, dbhdr.fsize, stat.st_size);
+ //       exit(1);
+ //   }
+
  
     
 
