@@ -5,51 +5,56 @@
 #include <sys/types.h>
 #include <sys/uio.h>
 #include <unistd.h>
+#include <errno.h>
+#include <string.h>
 
-//#include "common.h"
+#include "common.h"
 #include "parse.h"
-//#include "serialize.h"
-//
-//
-//int test_write_new_file_header()
-//{
-//    // Create a new file for reading and writing a database header to and from
-//    int test_fd = open("test_header_file.bin", O_RDWR | O_CREAT | O_TRUNC, 0666);
-//    if (write_new_file_hdr(test_fd) == STATUS_ERROR)
-//    {
-//        fprintf(stderr, "error writing header to new database file\n");
-//        return STATUS_ERROR;
-//    }   
-//
-//    
-//    db_header dbhdr;
-//    if (read(test_fd, &dbhdr, sizeof(db_header)) == STATUS_ERROR)
-//    {
-//        fprintf(stderr, "error reading header from new database file\n");
-//        return STATUS_ERROR;
-//    }
-//
-//    dbhdr.fsize = ntohl(dbhdr.fsize);
-//    dbhdr.employee_count = ntohl(dbhdr.employee_count);
-//    printf("fsize: %zu\n", dbhdr.fsize);
-//    printf("employee count: %zu", dbhdr.employee_count);
-//
-//    if (dbhdr.fsize != sizeof(dbhdr))
-//    {
-//        fprintf(stderr, "incorrect file size in database header: %zu should be %zu\n", dbhdr.fsize, sizeof(dbhdr));
-//        return STATUS_ERROR;
-//    }
-//
-//    if (dbhdr.employee_count != 0)
-//    {
-//        fprintf(stderr, "incorrect employee count: %zu should be %zu\n", dbhdr.employee_count, 0);
-//        return STATUS_ERROR;
-//    }
-//
-//    return STATUS_SUCCESS;
-//}
-//
+
+
+int test_parse_employee(void)
+{
+
+    char employee_str[] = "John Sample,123 easy st.,120";
+    employee e;
+    if (parse_employee(employee_str, &e) == STATUS_ERROR)
+    {
+        fprintf(stderr, "%s:%s:%d parse_employee() failed\n", __FILE__, __FUNCTION__, __LINE__);
+        return STATUS_ERROR;
+    }
+    
+    if (strcmp(e.name, "John Sample"))
+    {
+        fprintf(stderr, "%s:%s:%d employee's name parsed incorrectly: '%s' should b 'John Sample'\n", __FILE__, __FUNCTION__, __LINE__, e.name);
+        return STATUS_ERROR;
+    }
+
+    if (strcmp(e.address, "123 easy st."))
+    {
+        fprintf(stderr, "%s:%s:%d empoyee's address parsed incorrectly: '%s' should be '123 easy st.'\n", __FILE__, __FUNCTION__, __LINE__, e.address);
+        return STATUS_ERROR;
+    }
+
+    if (e.hours != 120)
+    {
+        fprintf(stderr, "%s:%s:%d employee's hours parsed incorrectly: %u should be 120\n", __FILE__, __FUNCTION__, __LINE__, e.hours);
+        return STATUS_ERROR;
+    }
+
+    return STATUS_SUCCESS;
+}
+
+
+
 int main(void)
 {
+    printf("test_parse_employee()...");
+    if (test_parse_employee() == STATUS_ERROR)
+    {
+        printf("failed\n");
+        return STATUS_ERROR;
+    }
+    printf("passed\n");
+
     return 0;
 }

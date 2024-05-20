@@ -78,7 +78,7 @@ int main(int argc, char *argv[])
     {
         if ((fd = open(fname, O_RDWR | O_CREAT | O_EXCL, 0666)) == -1)
         {
-            fprintf(stderr, "%s:%s:%d - file %s already exists: (%d) %s\n", __FILE__, __FUNCTION__, __LINE__, fname, errno, strerror(errno));
+            fprintf(stderr, "%s:%s:%d - error creating new file: (%d) %s\n", __FILE__, __FUNCTION__, __LINE__, fname, errno, strerror(errno));
             exit(1);
         }
         if (write_new_file_hdr(fd) == STATUS_ERROR) 
@@ -109,31 +109,43 @@ int main(int argc, char *argv[])
     {
         exit(1);
     }
-
-
-//    if (read(fd, &dbhrd, sizeof(db_header)) == -1)
- //   {
- //       fprintf(stderr, "%s:%s:%d - unable to read database header from file %s: (%d) %s\n", __FILE__, __FUNCTION__, __LINE__, fname, errno, strerror(errno));
- //       exit(1);
- //   }
- //   // Read stats from file, check file sizes in bytes match
- //   dbhdr.fsize = ntohl(dbhdr.fsize);
- //   dbhdr.employee_count = ntohl(dbhdr.employee_count);
- //   struct stat;
- //   if (fstat(fd, &stat) == -1)
- //   {
- //       fprintf(stderr, "%s:%s:%d - unable to read stats for file %s: (%d) %s\n", __FILE__, __FUNCTION__, __LINE__, fname, errno, strerror(errno));
- //       exit(1);
- //   }
-
- //   if (stat.st_size != dbhdr.fsize)
- //   {
- //       fprintf(stderr, "%s:%s:%d - corrupted data, header file size does not match stat size: header file size = %zu, stats file size = %zu\n", __FILE__, __FUNCTION__, __LINE__, dbhdr.fsize, stat.st_size);
- //       exit(1);
- //   }
-
- 
     
+    // process command line arguments
+    if (add_employee_str)
+    {
+        // Reallocate space for new employee
+        employees_size++
+        employee *new_employees = realloc(employees, sizeof(employee) * employees_size);
+        if (!new_employees)
+        {
+            fprintf(stderr, "%s:%s:%d error reallocating employees: (%d) %s\n", __FILE__, __FUNCTION__, __LINE__, errno, strerror(errno));
+            free(employees);
+            exit(1);
+        }
 
+        dbhdr.employee_count++;
+        employees = new_employees;
+        
+        if (parse_employee(add_employee_str, employees + (employees_size - 1)) == STATUS_ERROR)
+        {
+            fprintf(stderr, "%s:%s:%d parse_employee() failed\n", __FILE__, __FUNCTION__, __LINE__);
+            free(employees);
+            exit(1);
+        }
+
+        // Write output to file
+        if (write_db(fd, &dbhdr, employees) == STATUS_ERROR)
+        {
+            fprintf(stderr, "%s:%s:%d write_db failed()\n");
+            free(employees);
+            exit(1);
+        }
+    }
+
+
+        
+
+
+    }
 
 }

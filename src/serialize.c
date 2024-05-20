@@ -229,6 +229,34 @@ int write_new_file_hdr(int fd)
     return STATUS_SUCCESS;
 }
 
+int write_db(int fd, db_header *dbhdr, employee *employees)
+{
+    // Reset file cursor to beginning of file
+    if (lseek(fd, 0, SEEK_SET) == -1)
+    {
+        fprintf(stderr, "%s:%s:%d lseek() failed: (%d) %s\n", __FILE__, __FUNCTION__, __LINE__, errno, strerror(errno));
+        return STATUS_ERROR;
+    }
+
+    // convert header values to host endianess
+    dbhdr->fsize = htonl(dbhdr->fsize);
+    size_t employee_count = dbhdr->employee_count;
+    dbhdr->employee_count = htonl(dbhdr->employee_count);
+    if (write_all(fd, dbhdr, sizeof(dbhdr)) == STATUS_ERROR)
+    {
+        return STATUS_ERROR;
+    }
+
+    if (write_employees(fd, employees, employee_count) == STATUS_ERROR)
+    {
+        return STATUS_ERROR;
+    }
+
+    return STATUS_SUCCESS;
+}
+
+
+
 int write_employees(int fd, employee *employees, size_t employees_size)
 {
     size_t total_bytes = 0;
