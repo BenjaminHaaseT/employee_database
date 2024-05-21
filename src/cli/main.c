@@ -18,10 +18,11 @@
 void print_usage(char *argv[])
 {
     printf("Usage: %s -f <FILE> [OPTIONS]\n", argv[0]);
-    printf("\t-n : Flag to create a new database file from -f argument\n");
+    printf("\t-n : Flag to create a new database file using the -f argument\n");
     printf("\t-a <EMPLOYEE> : Add a new employee to the database file\n");
     printf("\t-d <EMPLOYEE NAME> : Delete an employee from the database file\n");
-    printf("\t-u <EMPLOYEE NAME> <EMPLOYEE HOURS> : Updates the hours for the employee with name <EMPLOYEE NAME>\n");
+    printf("\t-u <EMPLOYEE NAME> : Speicifies the name of the employee to be updated, requires that -h is also provided\n");
+    printf("\t-h <EMPLOYEE HOURS> : The hours that will update the employee specified by -u\n");
     printf("\t-l : Flag to list all employees in the database\n");
 }
 
@@ -32,11 +33,12 @@ int main(int argc, char *argv[])
     bool new_file_flag = false;
     char *add_employee_str = NULL;
     char *update_employee_str = NULL;
+    char *update_employee_hours_str = NULL;
     char *delete_employee_str = NULL;
     bool list_flag = false;
     int c;
 
-    while ((c = getopt(argc, argv, "f:na:d:u:l")) != -1)
+    while ((c = getopt(argc, argv, "f:na:d:u:h:l")) != -1)
     {
         switch (c)
         {
@@ -54,6 +56,9 @@ int main(int argc, char *argv[])
                 break;
             case 'u':
                 update_employee_str = optarg;
+                break;
+            case 'h':
+                update_employee_hours_str = optarg;
                 break;
             case 'l':
                 list_flag = true;
@@ -136,16 +141,52 @@ int main(int argc, char *argv[])
         // Write output to file
         if (write_db(fd, &dbhdr, employees) == STATUS_ERROR)
         {
-            fprintf(stderr, "%s:%s:%d write_db failed()\n");
+            fprintf(stderr, "%s:%s:%d write_db failed()\n", __FILE__, __FUNCTION__, __LINE__);
             free(employees);
             exit(1);
         }
     }
 
+    // validate arugments for updating an employee
+    if (update_employee_str && update_employee_hours_str)
+    {
+        if (update_employee(update_employee_str, update_employee_hours_str, employees, employees_size) == STATUS_ERROR)
+        {
+            fprintf("%s:%s:%d update_employee() failed\n", __FILE__, __FUNCTION__, __LINE__);
+            free(employees);
+            exit(1);
+        }
+
+        if (write_db(fd, &dbhdr, employees) == STATUS_ERROR)
+        {
+            fprintf(stderr, "%s:%s:%d write_db() failed\n", __FILE__, __FUNCTION__, __LINE__);
+            free(employees);
+            exit(1);
+        }
+    }
+    else if (update_employee_str && !update_employee_hours_str)
+    {
+        fprintf(stderr, "required: -h\n");
+        print_usage(argv);
+        free(employees);
+        exit(1);
+    }
+    else if (!update_employee_str && update_employee_hours_str)
+    {
+        fprintf(stderr, "required: -u\n");
+        print_usage(argv);
+        free(employees);
+        exit(1);
+    }
+
+
+    
+
+
 
         
 
 
-    }
+    
 
 }

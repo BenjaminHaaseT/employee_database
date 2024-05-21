@@ -35,3 +35,29 @@ int parse_employee(char *employee_str, employee *e)
     return STATUS_SUCCESS;
 }
 
+
+int update_employee(char *employee_name, char *shours, employee *employees, size_t employees_size)
+{
+    // parse employee hours
+    char *end = NULL;
+    uint32_t hours = strtol(shours, &end, 10);
+    if (!end || end == shours || *end != '\0')
+    {
+        fprintf(stderr, "unable to parse hours correctly\n");
+        return STATUS_ERROR;
+    }
+
+    // search for the employee to update
+    for (size_t i = 0; i < employees_size; i++)
+    {
+        if (!strcmp(employees[i].name, employee_name))
+        {
+            employees[i].hours = hours;
+            return STATUS_SUCCESS;
+        }
+    }
+
+    fprintf(stderr, "employee '%s' not present in database\n", employee_name);
+    return STATUS_ERROR;
+}
+
