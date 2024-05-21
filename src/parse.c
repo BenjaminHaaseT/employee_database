@@ -61,3 +61,27 @@ int update_employee(char *employee_name, char *shours, employee *employees, size
     return STATUS_ERROR;
 }
 
+int delete_employee(char *employee_name, employee *employees, size_t *employees_size)
+{
+    // search for employee to be deleted
+    for (size_t i = 0; i < employees_size; i++)
+    {
+        if (!strcmp(employee_name, employees[i].name))
+        {
+            employee temp = employees[*employees_size - 1];
+            employees[*employees_size - 1] = employees[i];
+            employees[i] = temp;
+            free(employees[*employees_size - 1].name);
+            free(employees[*employees_size - 1].address);
+            *employees_size -= 1;
+            return STATUS_SUCCESS;
+        }
+    }
+
+    fprintf(stderr, "'%s' not present in database\n", employee_name);
+    return STATUS_ERROR;
+}
+
+        
+
+
