@@ -1,5 +1,7 @@
 SRC=src
 OBJ=obj
+EXECSRC=executable_src
+BIN=bin
 INCDIR=include
 TESTSRC=test/src
 TESTBIN=test/bin
@@ -12,11 +14,13 @@ CFLAGS=-Wall -Werror -g $(foreach D, $(INCDIR), -I$(D)) $(OPT) $(DEPFLAGS)
 SRCFILES=$(foreach D, $(SRC), $(wildcard $(D)/*.c))
 OBJFILES=$(patsubst $(SRC)/%.c, $(OBJ)/%.o, $(SRCFILES))
 DEPFILES=$(patsubst $(SRC)/%.c, $(OBJ)/%.d, $(SRCFILES))
-
-TESTSRCFILES=$(foreach D, $(TESTSRC), $(wildcard $(D)/*.c))
-TESTBINFILES=$(patsubst $(TESTSRC)/%.c, $(TESTBIN)/%, $(TESTSRCFILES))
+EXECSRCFILES=$(foreach D, $(EXECSRC), $(wildcard $(D)/*/*.c))
+BINFILES=$(patsubst $(EXECSRC)/%/%.c, $(BIN)/%, $(EXECSRCFILES))
 
 build: $(OBJFILES)
+
+build_cli: $(EXECSRC)/cli/cli.c $(OBJFILES)
+	$(CC) -g -o$(BIN)/cli $^ -I$(INCDIR) -Wall -Werror $(OPT)
 
 build_test:$(TESTBINFILES)
 

@@ -11,6 +11,7 @@
 
 #include "common.h"
 #include "parse.h"
+#include "serialize.h"
 
 
 
@@ -83,19 +84,25 @@ int main(int argc, char *argv[])
     {
         if ((fd = open(fname, O_RDWR | O_CREAT | O_EXCL, 0666)) == -1)
         {
-            fprintf(stderr, "%s:%s:%d - error creating new file: (%d) %s\n", __FILE__, __FUNCTION__, __LINE__, fname, errno, strerror(errno));
+            fprintf(stderr, "%s:%s:%d - error creating new file '%s' : (%d) %s\n", __FILE__, __FUNCTION__, __LINE__, fname, errno, strerror(errno));
             exit(1);
         }
         if (write_new_file_hdr(fd) == STATUS_ERROR) 
         {
             exit(1);
         }
+		// reset file cursor to beginning
+		if (lseek(fd, 0, SEEK_SET) == -1)
+		{
+			fprintf(stderr, "%s:%s:%d - unable to reset file cursor: (%d) %s\n", __FILE__, __FUNCTION__, __LINE__, errno, strerror(errno));
+			exit(1);
+		}
     }
     else
     {
         if ((fd = open(fname, O_RDWR, 0666)) == -1)
         {
-            fprintf(stderr, "%s:%s:%d - unable to open file %s: (%s) %s\n", __FILE__, __FUNCTION__, __LINE__, fname, errno, strerror(errno));
+            fprintf(stderr, "%s:%s:%d - unable to open file %s: (%d) %s\n", __FILE__, __FUNCTION__, __LINE__, fname, errno, strerror(errno));
             exit(1);
         }
     }
@@ -119,7 +126,7 @@ int main(int argc, char *argv[])
     if (add_employee_str)
     {
         // Reallocate space for new employee
-        employees_size++
+        employees_size++;
         employee *new_employees = realloc(employees, sizeof(employee) * employees_size);
         if (!new_employees)
         {
@@ -152,7 +159,7 @@ int main(int argc, char *argv[])
     {
         if (update_employee(update_employee_str, update_employee_hours_str, employees, employees_size) == STATUS_ERROR)
         {
-            fprintf("%s:%s:%d update_employee() failed\n", __FILE__, __FUNCTION__, __LINE__);
+            fprintf(stderr, "%s:%s:%d update_employee() failed\n", __FILE__, __FUNCTION__, __LINE__);
             free(employees);
             exit(1);
         }
@@ -179,14 +186,33 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
+    if (delete_employee_str)
+    {
+        if (delete_employee(delete_employee_str, employees, employees_size) == STATUS_ERROR)
+        {
+            fprintf(stderr, "%s:%s:%d delete_employee() failed\n", __FILE__, __FUNCTION__, __LINE__);
+            free(employees);
+            exit(1);
+        }
 
-    
+		employees_size--;
+        dbhdr.employee_count--;
+        if (write_db(fd, &dbhdr, employees) == STATUS_ERROR)
+        {
+            fprintf(stderr, "%s:%s:%d write_db() failed\n", __FILE__, __FUNCTION__, __LINE__);
+            free(employees);
+            exit(1);
+        }
+    }
 
+    if (list_flag)
+    {
+        for (size_t i = 0; i < employees_size; i++)
+        {
+            printf("%s %s %u\n", employees[i].name, employees[i].address, employees[i].hours);
+        }
+    }
 
-
-        
-
-
-    
-
+    free(employees);
+    return 0;
 }
