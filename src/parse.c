@@ -11,9 +11,11 @@
 int parse_employee(char *employee_str, employee *e)
 {
 
+//    printf("%s\n", employee_str);
     char *name = strtok(employee_str, ",");
     char *address = strtok(NULL, ",");
     char *shours = strtok(NULL, ",");
+ //   printf("%s, %s, %s\n", name, address, shours);
     if (!name || !address || !shours)
     {
         fprintf(stderr, "%s:%s:%d - bad argument, <EMPLOYEE>: 'name,address,hours'\n", __FILE__, __FUNCTION__, __LINE__);

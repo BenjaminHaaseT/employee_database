@@ -231,28 +231,43 @@ int write_new_file_hdr(int fd)
 
 int write_db(int fd, db_header *dbhdr, employee *employees)
 {
-    // Reset file cursor to beginning of file
-    if (lseek(fd, 0, SEEK_SET) == -1)
-    {
-        fprintf(stderr, "%s:%s:%d lseek() failed: (%d) %s\n", __FILE__, __FUNCTION__, __LINE__, errno, strerror(errno));
-        return STATUS_ERROR;
-    }
+	// change file cursor byte right after file header
+	if (lseek(fd, sizeof(db_header), SEEK_SET) == -1)
+	{
+		fprintf(stderr, "%s:%s:%d lseek() failed: (%d) %s\n", __FILE__, __FUNCTION__, __LINE__, errno, strerror(errno));
+		return STATUS_ERROR;
+	}
 
-    // convert header values to host endianess
-    dbhdr->fsize = htonl(dbhdr->fsize);
-    size_t employee_count = dbhdr->employee_count;
-    dbhdr->employee_count = htonl(dbhdr->employee_count);
-    if (write_all(fd, dbhdr, sizeof(dbhdr)) == STATUS_ERROR)
-    {
-        return STATUS_ERROR;
-    }
+	// write employees to file
+	int nbytes_written = write_employees(fd, employees, dbhdr->employee_count);
+	if (nbytes_written == -1)
+	{
+		fprintf(stderr, "%s:%s:%d write_employees faile()\n", __FILE__, __FUNCTION__, __LINE__);
+		return STATUS_ERROR;
+	}
 
-    if (write_employees(fd, employees, employee_count) == STATUS_ERROR)
-    {
-        return STATUS_ERROR;
-    }
+	// record size of file
+	dbhdr->fsize = sizeof(db_header) + nbytes_written;
+	
+	// Convert to network byte order
+	dbhdr->fsize = htonl(dbhdr->fsize);
+	dbhdr->employee_count = htonl(dbhdr->employee_count);
 
-    return STATUS_SUCCESS;
+	// change file cursor to beginning of file
+	if (lseek(fd, 0, SEEK_SET) == -1)
+	{
+		fprintf(stderr, "%s:%s:%d lseek() failed: (%d) %s\n", __FILE__, __FUNCTION__, __LINE__, errno, strerror(errno));
+		return STATUS_ERROR;
+	}
+
+	// now write header to file
+	if (write(fd, dbhdr, sizeof(db_header)) == -1)
+	{
+		fprintf(stderr, "%s:%s:%d unable to write header to file: (%d) %s\n", __FILE__, __FUNCTION__, __LINE__, errno, strerror(errno));
+		return STATUS_ERROR;
+	}
+
+	return STATUS_SUCCESS;
 }
 
 

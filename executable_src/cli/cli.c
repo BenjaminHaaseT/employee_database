@@ -144,14 +144,6 @@ int main(int argc, char *argv[])
             free(employees);
             exit(1);
         }
-
-        // Write output to file
-        if (write_db(fd, &dbhdr, employees) == STATUS_ERROR)
-        {
-            fprintf(stderr, "%s:%s:%d write_db failed()\n", __FILE__, __FUNCTION__, __LINE__);
-            free(employees);
-            exit(1);
-        }
     }
 
     // validate arugments for updating an employee
@@ -160,13 +152,6 @@ int main(int argc, char *argv[])
         if (update_employee(update_employee_str, update_employee_hours_str, employees, employees_size) == STATUS_ERROR)
         {
             fprintf(stderr, "%s:%s:%d update_employee() failed\n", __FILE__, __FUNCTION__, __LINE__);
-            free(employees);
-            exit(1);
-        }
-
-        if (write_db(fd, &dbhdr, employees) == STATUS_ERROR)
-        {
-            fprintf(stderr, "%s:%s:%d write_db() failed\n", __FILE__, __FUNCTION__, __LINE__);
             free(employees);
             exit(1);
         }
@@ -197,12 +182,6 @@ int main(int argc, char *argv[])
 
 		employees_size--;
         dbhdr.employee_count--;
-        if (write_db(fd, &dbhdr, employees) == STATUS_ERROR)
-        {
-            fprintf(stderr, "%s:%s:%d write_db() failed\n", __FILE__, __FUNCTION__, __LINE__);
-            free(employees);
-            exit(1);
-        }
     }
 
     if (list_flag)
@@ -212,6 +191,14 @@ int main(int argc, char *argv[])
             printf("%s %s %u\n", employees[i].name, employees[i].address, employees[i].hours);
         }
     }
+
+	// Write output to file
+	if (write_db(fd, &dbhdr, employees) == STATUS_ERROR)
+	{
+		fprintf(stderr, "%s:%s:%d write_db failed()\n", __FILE__, __FUNCTION__, __LINE__);
+		free(employees);
+		exit(1);
+	}
 
     free(employees);
     return 0;
