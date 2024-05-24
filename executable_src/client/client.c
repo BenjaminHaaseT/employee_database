@@ -80,11 +80,38 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-
-
 	// get info for host/port
+    int status;
+    struct addrinfo hints = {0}; 
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
 
-	// create socket for host/port
+    struct addrinfo *servinfo;
+    if ((status = getaddrinfo(host, port, &hints, &servinfo)) == -1)
+    {
+        fprintf(stderr, "getaddrinfo() failed: (%d) %s\n", status, gaistrerror(status));
+        exit(1);
+    }
+        
+	// attempt to create a socket from the given server
+    int sockfd;
+    struct addrinfo *ptr; 
+    for (ptr = servinfo; ptr; ptr = ptr->ai_next)
+    {
+        if ((sockfd = socket(ptr->ai_family, ptr->ai_socktype, ptr->ai_protocol)) == -1)
+            continue;
+        break;
+    }
+
+    // validate socket
+    if (sockfd == -1)
+    {
+        fprintf(stderr, "unable to instantiate socket: %s\n", strerror(errno));
+        exit(1);
+    }
+
+
+
 
 	// connect to socket and ensure connection has been established
 
