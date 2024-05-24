@@ -1,15 +1,11 @@
 #ifndef PROTO_H
 #define PROTO_H
 
-typedef struct {
-    char *name;
-    char *address;
-    uint32_t hours;
-} employee;
+typedef enum {
+    HANDSHAK_RESPONSE,  /* Response to client connecting to server */
+    DB_ACCESS_REQUEST,  /* Request from client to access the database */
+    DB_ACCESS_RESPONSE, /* Response from server to a client's db access request */
+} proto_msg;
 
-typedef struct {
-    size_t fsize;                /* Size of file in bytes */
-    size_t employee_count;       /* count of employees in file */
-} db_header;
 
 #endif
