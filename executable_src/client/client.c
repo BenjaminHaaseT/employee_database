@@ -7,30 +7,24 @@
 #include <errno.h>
 #include <string.h>
 #include <stdbool.h>
+#include <sys/socket.h>
+#include <sys/types.h>
 
-void print_usage(char **argv)
-{
-    printf("usage: %s -h -p [OPTIONS]\n", argv[0]);
-    printf("\t-h <HOST> : address of host\n");
-    printf("\t-p <PORT> : port of host\n");
-    printf("\t-a <EMPLOYEE> : add an employee to the database, <EMPLOYEE> should be a comma seperated list of values\n");
-    printf("\t-u <EMPLOYEE NAME> : name of an employee whose hours are to be updated, -n argument is also required to specify number of hours\n");
-    printf("\t-n <HOURS> : the number of hours to update a given employee\n");
-    printf("\t-d <EMPLOYEE NAME> : deletes an the employee with <EMPLOYEE NAME> from the databaes\n");
-    printf("\t-l : list all employees in the database\n");
+void print_usage(char **argv);
+int send_handshake(int socket);
 
-}
 
 int main(int argc, char *argv[])
 {
 	// validate command line arguments
-    if (argc < 3)
+    if (argc < 4)
     {
         print_usage(argv);
         return 0;
     }
 
 	// Parse command line arguments
+    char *protocol_version_str = NULL;
     char *host = NULL;
     char *port = NULL;
     char *add_employee_str = NULL;
@@ -40,10 +34,13 @@ int main(int argc, char *argv[])
     bool list_flag = false;
 
     int c;
-    while ((c = getopt(argc, argv, "h:p:a:u:n:d:l")) != -1)
+    while ((c = getopt(argc, argv, "v:h:p:a:u:n:d:l")) != -1)
     {
         switch (c)
         {
+            case 'v':
+                protocol_version_str = optarg;
+                break;
             case 'h':
                 host = optarg;
                 break;
@@ -74,9 +71,18 @@ int main(int argc, char *argv[])
     }
 
 	// ensure host and port are both valid
-    if (!host || !port)
+    if (!host || !port || !protocol_version)
     {
         print_usage(argv);
+        exit(1);
+    }
+
+    // parse protocol version
+    char *end = NULL;
+    long parsed_protocol_version = strtol(protocol_version, &end, 10);
+    if (!end || *end != '\0' || parsed_protocol_version < 0)
+    {
+        fprintf(stderr, "invalid protocol version\n");
         exit(1);
     }
 
@@ -104,21 +110,49 @@ int main(int argc, char *argv[])
     }
 
     // validate socket
-    if (sockfd == -1)
+    if (sockfd == -1 || !ptr)
     {
         fprintf(stderr, "unable to instantiate socket: %s\n", strerror(errno));
         exit(1);
     }
 
-
-
-
 	// connect to socket and ensure connection has been established
+    if (connect(sockfd, ptr->ai_addr, ptr->ai_addrlen) == -1)
+    {
+        fprintf(stderr, "unable to connect to host: %s\n", strerror(errno));
+        exit(1);
+    }
+    
+    freeaddrinfo(servinfo);
+
 
 	// serialize request
 
 	// send request
 
 	// de-serialize and parse response
+
+}
+
+
+
+
+void print_usage(char **argv)
+{
+    printf("usage: %s -h <HOST> -p <PORT> -v <VERSION> [OPTIONS]\n", argv[0]);
+    printf("\t-v <VERSION> : protocol version\n");
+    printf("\t-h <HOST> : address of host\n");
+    printf("\t-p <PORT> : port of host\n");
+    printf("\t-a <EMPLOYEE> : add an employee to the database, <EMPLOYEE> should be a comma seperated list of values\n");
+    printf("\t-u <EMPLOYEE NAME> : name of an employee whose hours are to be updated, -n argument is also required to specify number of hours\n");
+    printf("\t-n <HOURS> : the number of hours to update a given employee\n");
+    printf("\t-d <EMPLOYEE NAME> : deletes an the employee with <EMPLOYEE NAME> from the databaes\n");
+    printf("\t-l : list all employees in the database\n");
+
+}
+
+
+int send_handshake(int socket)
+{
 
 }
