@@ -10,6 +10,11 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 
+#include "proto.h"
+#include "common.h"
+#include "serialize.h"
+
+
 void print_usage(char **argv);
 int send_handshake(int socket);
 
@@ -124,7 +129,26 @@ int main(int argc, char *argv[])
     }
     
     freeaddrinfo(servinfo);
+    
+    // serialize/send handshake request
+    if (send_handshake(sockfd, parsed_protocol_version) == STATUS_ERROR)
+    {
+        fprintf(stderr, "unable to send handshake\n");
+        exit(1);
+    }
 
+    // wait for handshake response from server, confirm protocol versions match
+    proto_msg *handshake_response = malloc(HANDSHAKE_RESP_SIZE);
+    if (recieve_all(sockfd, handshake_response, HANDSHAKE_RESP_SIZE, 0) == STATUS_ERROR)
+    {
+        fprintf(stderr, "unable to receive handshake response\n");
+        exit(1);
+    }
+    if (*(unsigned char *)(handshake_response + 1))
+    {
+        fprintf(stderr, "invalid protocol version\n");
+        exit(1);
+    }
 
 	// serialize request
 
@@ -152,7 +176,18 @@ void print_usage(char **argv)
 }
 
 
-int send_handshake(int socket)
+int send_handshake(int socket, uint16_t protocol_version)
 {
+    // instantiate request
+    // size_t msg_size = sizeof(proto_msg) + sizeof(uint16_t);
+    proto_msg *handshake_req = malloc(HANDSHAKE_REQ_SIZE);
+    handshake_req[0] = HANDHSAKE_REQUEST;
+    *(uint16_t *)(handshake_req + 1) = htons(protocol_version);
 
+    if (send_all(socket, handshake_req, HANDSHAKE_REQ_SIZE, 0) == STATUS_ERROR)
+    {
+        return STATUS_ERROR;
+    }
+
+    return STATUS_SUCCESS;
 }

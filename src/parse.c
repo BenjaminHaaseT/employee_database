@@ -8,14 +8,12 @@
 #include "common.h"
 
 
-int parse_employee(char *employee_str, employee *e)
+int parse_employee_vals(char *employee_str, char **name, char **address, uint32_t *hours)
 {
 
-//    printf("%s\n", employee_str);
-    char *name = strtok(employee_str, ",");
-    char *address = strtok(NULL, ",");
+    *name = strtok(employee_str, ",");
+    *address = strtok(NULL, ",");
     char *shours = strtok(NULL, ",");
- //   printf("%s, %s, %s\n", name, address, shours);
     if (!name || !address || !shours)
     {
         fprintf(stderr, "%s:%s:%d - bad argument, <EMPLOYEE>: 'name,address,hours'\n", __FILE__, __FUNCTION__, __LINE__);
@@ -24,10 +22,41 @@ int parse_employee(char *employee_str, employee *e)
 
     // convert shours to unsigned integer
     char *end_ptr = NULL;
-    uint32_t hours = (uint32_t) strtol(shours, &end_ptr, 10);
+    *hours = (uint32_t) strtol(shours, &end_ptr, 10);
     if (end_ptr == shours || *end_ptr != '\0')
     {
         fprintf(stderr, "bad argument: (%d) %s\n", errno, strerror(errno));
+        return STATUS_ERROR;
+    }
+    return STATUS_SUCCESS;
+}
+
+
+int parse_employee(char *employee_str, employee *e)
+{
+
+//    char *name = strtok(employee_str, ",");
+//    char *address = strtok(NULL, ",");
+//    char *shours = strtok(NULL, ",");
+//    if (!name || !address || !shours)
+//    {
+//        fprintf(stderr, "%s:%s:%d - bad argument, <EMPLOYEE>: 'name,address,hours'\n", __FILE__, __FUNCTION__, __LINE__);
+//        return STATUS_ERROR;
+//    }
+//
+//    // convert shours to unsigned integer
+//    char *end_ptr = NULL;
+//    uint32_t hours = (uint32_t) strtol(shours, &end_ptr, 10);
+//    if (end_ptr == shours || *end_ptr != '\0')
+//    {
+//        fprintf(stderr, "bad argument: (%d) %s\n", errno, strerror(errno));
+//        return STATUS_ERROR;
+//    }
+    char *name, *address;
+    uint32_t hours;
+    if (parse_employee_vals(employee_str, &name, &address, &hours) == STATUS_ERROR)
+    {
+        fprintf(stderr, "parse_employee_str failed\n");
         return STATUS_ERROR;
     }
 
