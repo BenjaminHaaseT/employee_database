@@ -13,7 +13,7 @@ typedef enum {
 
 int send_all(int socket, const void *buf, size_t buf_size, int flags);
 int receive_all(int socket, void *buf, size_t buf_size, int flags);
-int serialize_add_employee_request(char **buf, char *cursor, size_t capacity, char *add_employee_str);
+int serialize_add_employee_request(char **buf, char *cursor, size_t *capacity, char *add_employee_str);
 
 
 #endif
