@@ -16,7 +16,7 @@
 
 
 void print_usage(char **argv);
-int send_handshake(int socket);
+int send_handshake(int socket, uint16_t protocol_version);
 
 
 int main(int argc, char *argv[])
@@ -76,7 +76,7 @@ int main(int argc, char *argv[])
     }
 
 	// ensure host and port are both valid
-    if (!host || !port || !protocol_version)
+    if (!host || !port || !protocol_version_str)
     {
         print_usage(argv);
         exit(1);
@@ -84,7 +84,7 @@ int main(int argc, char *argv[])
 
     // parse protocol version
     char *end = NULL;
-    long parsed_protocol_version = strtol(protocol_version, &end, 10);
+    long parsed_protocol_version = strtol(protocol_version_str, &end, 10);
     if (!end || *end != '\0' || parsed_protocol_version < 0)
     {
         fprintf(stderr, "invalid protocol version\n");
@@ -100,7 +100,7 @@ int main(int argc, char *argv[])
     struct addrinfo *servinfo;
     if ((status = getaddrinfo(host, port, &hints, &servinfo)) == -1)
     {
-        fprintf(stderr, "getaddrinfo() failed: (%d) %s\n", status, gaistrerror(status));
+        fprintf(stderr, "getaddrinfo() failed: (%d) %s\n", status, gai_strerror(status));
         exit(1);
     }
         
@@ -139,7 +139,7 @@ int main(int argc, char *argv[])
 
     // wait for handshake response from server, confirm protocol versions match
     proto_msg *handshake_response = malloc(HANDSHAKE_RESP_SIZE);
-    if (recieve_all(sockfd, handshake_response, HANDSHAKE_RESP_SIZE, 0) == STATUS_ERROR)
+    if (receive_all(sockfd, handshake_response, HANDSHAKE_RESP_SIZE, 0) == STATUS_ERROR)
     {
         fprintf(stderr, "unable to receive handshake response\n");
         exit(1);
@@ -150,12 +150,15 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-	// serialize request
+    // create buffer and cursor for serializing request
+    // char *buf
+	// serialize request's adding to buffer
 
 	// send request
 
 	// de-serialize and parse response
 
+    return 0;
 }
 
 
@@ -181,7 +184,7 @@ int send_handshake(int socket, uint16_t protocol_version)
     // instantiate request
     // size_t msg_size = sizeof(proto_msg) + sizeof(uint16_t);
     proto_msg *handshake_req = malloc(HANDSHAKE_REQ_SIZE);
-    handshake_req[0] = HANDHSAKE_REQUEST;
+    handshake_req[0] = HANDSHAKE_REQUEST;
     *(uint16_t *)(handshake_req + 1) = htons(protocol_version);
 
     if (send_all(socket, handshake_req, HANDSHAKE_REQ_SIZE, 0) == STATUS_ERROR)

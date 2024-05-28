@@ -66,17 +66,37 @@ int parse_employee(char *employee_str, employee *e)
     return STATUS_SUCCESS;
 }
 
-
-int update_employee(char *employee_name, char *shours, employee *employees, size_t employees_size)
+int parse_employee_hours(char *shours, uint32_t *hours)
 {
     // parse employee hours
     char *end = NULL;
-    uint32_t hours = strtol(shours, &end, 10);
+    *hours = strtol(shours, &end, 10);
     if (!end || end == shours || *end != '\0')
     {
-        fprintf(stderr, "unable to parse hours correctly\n");
+        fprintf(stderr, "%s:%s:%d unable to parse hours correctly\n", __FILE__, __FUNCTION__, __LINE__);
         return STATUS_ERROR;
     }
+    return STATUS_SUCCESS;
+}
+
+
+
+
+int update_employee(char *employee_name, char *shours, employee *employees, size_t employees_size)
+{
+    // parse the employee hours
+    uint32_t hours;
+    if (parse_employee_hours(shours, &hours) == STATUS_ERROR)
+    {
+        return STATUS_ERROR;
+    }
+//    char *end = NULL;
+//    uint32_t hours = strtol(shours, &end, 10);
+//    if (!end || end == shours || *end != '\0')
+//    {
+//        fprintf(stderr, "unable to parse hours correctly\n");
+//        return STATUS_ERROR;
+//    }
 
     // search for the employee to update
     for (size_t i = 0; i < employees_size; i++)
