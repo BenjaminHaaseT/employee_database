@@ -17,6 +17,9 @@ DEPFILES=$(patsubst $(SRC)/%.c, $(OBJ)/%.d, $(SRCFILES))
 EXECSRCFILES=$(foreach D, $(EXECSRC), $(wildcard $(D)/*/*.c))
 BINFILES=$(patsubst $(EXECSRC)/%/%.c, $(BIN)/%, $(EXECSRCFILES))
 
+TESTSRCFILES=$(foreach D, $(TESTSRC), $(wildcard $(D)/*.c))
+TESTBINFILES=$(patsubst $(TESTSRC)/%.c, $(TESTBIN)/%, $(TESTSRCFILES))
+
 build: $(OBJFILES)
 
 build_cli: $(EXECSRC)/cli/cli.c $(OBJFILES)
@@ -27,10 +30,10 @@ build_client: $(EXECSRC)/client/client.c $(OBJFILES)
 
 build_test:$(TESTBINFILES)
 
-$(TESTBIN)/%_test:$(TESTSRC)/%_test.c $(OBJ)/%.o
+$(TESTBIN)/%_test: $(TESTSRC)/%_test.c $(OBJFILES)
 	$(CC) -o $@ $^ -I$(INCDIR) -Wall -Werror
 
-$(OBJ)/%.o:$(SRC)/%.c
+$(OBJ)/%.o: $(SRC)/%.c
 	$(CC) $(CFLAGS) -c $< -o $@ 
 
 clean:

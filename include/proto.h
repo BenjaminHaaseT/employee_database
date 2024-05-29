@@ -1,6 +1,8 @@
 #ifndef PROTO_H
 #define PROTO_H
 
+#include "parse.h"
+
 typedef enum {
     HANDSHAKE_REQUEST,  /* Request from a client to connect to the server, includes protocol version */
     HANDSHAK_RESPONSE,  /* Response to client connecting to server, validates protocol version being used by client*/

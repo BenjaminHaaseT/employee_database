@@ -10,11 +10,11 @@
 
 int parse_employee_vals(char *employee_str, char **name, char **address, uint32_t *hours)
 {
-
     *name = strtok(employee_str, ",");
     *address = strtok(NULL, ",");
     char *shours = strtok(NULL, ",");
-    if (!name || !address || !shours)
+
+    if (!*name || !*address || !*shours)
     {
         fprintf(stderr, "%s:%s:%d - bad argument, <EMPLOYEE>: 'name,address,hours'\n", __FILE__, __FUNCTION__, __LINE__);
         return STATUS_ERROR;

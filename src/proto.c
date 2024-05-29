@@ -8,7 +8,7 @@
 
 #include "proto.h"
 #include "common.h"
-#include "parse.h"
+//#include "parse.h"
 
 
 int send_all(int socket, const void *buf, size_t buf_size, int flags)
@@ -82,7 +82,7 @@ int serialize_add_employee_request(char **buf, char *cursor, size_t *capacity, c
 
     size_t name_len = strlen(name);
     // ensure name does not exceed allowed maximum
-    if (name_len - UINT16_MAX > 0)
+    if (name_len > UINT16_MAX)
     {
         fprintf(stderr, "%s:%s:%d size of name exceeds allowed maximum", __FILE__, __FUNCTION__, __LINE__);
         return STATUS_ERROR;
@@ -90,7 +90,7 @@ int serialize_add_employee_request(char **buf, char *cursor, size_t *capacity, c
 
     size_t address_len = strlen(address);
     // ensure address does not exceed allowed maximum size
-    if (address_len - UINT16_MAX > 0)
+    if (address_len > UINT16_MAX)
     {
         fprintf(stderr, "%s:%s:%d size of address exceeds allowed maximum", __FILE__, __FUNCTION__, __LINE__);
         return STATUS_ERROR;
@@ -159,7 +159,7 @@ int serialize_update_employee_request(char **buf, char *cursor, size_t *capacity
 
     // serialize name of employee, validate length does not exceed maximum allowed length
     size_t name_len = strlen(update_employee_name);
-    if (name_len - UINT16_MAX > 0)
+    if (name_len > UINT16_MAX)
     {
         fprintf(stderr, "%s:%s:%d size of name exceeds allowed maximum", __FILE__, __FUNCTION__, __LINE__);
         return STATUS_ERROR;
@@ -213,7 +213,7 @@ int serialize_delete_employee_request(char **buf, char *cursor, size_t *capacity
 {
     // compute length of employee name, and validate it does not exceed maximum
     size_t name_len = strlen(delete_employee_name);
-    if (name_len - UINT16_MAX > 0)
+    if (name_len > UINT16_MAX)
     {
         fprintf(stderr, "%s:%s:%d size of name exceeds allowed maximum", __FILE__, __FUNCTION__, __LINE__);
         return STATUS_ERROR;

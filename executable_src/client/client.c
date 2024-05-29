@@ -151,8 +151,51 @@ int main(int argc, char *argv[])
     }
 
     // create buffer and cursor for serializing request
-    // char *buf
-	// serialize request's adding to buffer
+     size_t capacity = sizeof(proto_msg) + sizeof(uint32_t);
+     char *buf = malloc(capacity);
+     char *cursor = buf + capacity;
+
+	// serialize request's, writing to buffer
+     if (add_employee_str)
+     {
+        if (serialize_add_employee_request(&buf, cursor, &capacity, add_employee_str) == STATUS_ERROR)
+        {
+            fprintf(stderr, "unable to serialize add employee request\n");
+            exit(1);
+        }
+     }
+
+     if (update_employee_str && update_hours_str)
+     {
+         if (serialize_update_employee_request(&buf, cursor, &capacity, update_employee_str, update_hours_str) == STATUS_ERROR)
+         {
+             fprintf(stderr, "unable to serialize update employee request\n");
+             exit(1);
+         }
+     }
+     else if ((update_employee_str && !update_hours_str) || (!update_employee_str && update_hours_str))
+     {
+         print_usage(argv);
+         exit(1);
+     }
+
+    if (delete_employee_str)
+    {
+        if (serialize_delete_employee_request(&buf, cursor, &capacity, delete_employee_str) == STATUS_ERROR)
+        {
+            fprintf(stderr, "unable to serialize delete employee request\n");
+            exit(1);
+        }
+    }
+
+    if (list_flag)
+    {
+        if (serialize_list_request(&buf, cursor, &capacity) == STATUS_ERROR)
+        {
+            fprintf(stderr, "unable to serialize list request\n");
+            exit(1);
+        }
+    }
 
 	// send request
 
