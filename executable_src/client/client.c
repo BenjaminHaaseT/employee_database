@@ -158,7 +158,7 @@ int main(int argc, char *argv[])
 	// serialize request's, writing to buffer
      if (add_employee_str)
      {
-        if (serialize_add_employee_request(&buf, cursor, &capacity, add_employee_str) == STATUS_ERROR)
+        if (serialize_add_employee_option(&buf, cursor, &capacity, add_employee_str) == STATUS_ERROR)
         {
             fprintf(stderr, "unable to serialize add employee request\n");
             exit(1);
@@ -167,7 +167,7 @@ int main(int argc, char *argv[])
 
      if (update_employee_str && update_hours_str)
      {
-         if (serialize_update_employee_request(&buf, cursor, &capacity, update_employee_str, update_hours_str) == STATUS_ERROR)
+         if (serialize_update_employee_option(&buf, cursor, &capacity, update_employee_str, update_hours_str) == STATUS_ERROR)
          {
              fprintf(stderr, "unable to serialize update employee request\n");
              exit(1);
@@ -181,7 +181,7 @@ int main(int argc, char *argv[])
 
     if (delete_employee_str)
     {
-        if (serialize_delete_employee_request(&buf, cursor, &capacity, delete_employee_str) == STATUS_ERROR)
+        if (serialize_delete_employee_option(&buf, cursor, &capacity, delete_employee_str) == STATUS_ERROR)
         {
             fprintf(stderr, "unable to serialize delete employee request\n");
             exit(1);
@@ -190,7 +190,7 @@ int main(int argc, char *argv[])
 
     if (list_flag)
     {
-        if (serialize_list_request(&buf, cursor, &capacity) == STATUS_ERROR)
+        if (serialize_list_option(&buf, cursor, &capacity) == STATUS_ERROR)
         {
             fprintf(stderr, "unable to serialize list request\n");
             exit(1);

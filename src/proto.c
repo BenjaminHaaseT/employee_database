@@ -7,7 +7,7 @@
 #include <arpa/inet.h>
 
 #include "proto.h"
-#include "common.h"
+//#include "common.h"
 //#include "parse.h"
 
 
@@ -70,7 +70,7 @@ int resize_request_buffer(char **buf, char *cursor, size_t *capacity, size_t dat
     return STATUS_SUCCESS;
 }
 
-int serialize_add_employee_request(char **buf, char *cursor, size_t *capacity, char *add_employee_str)
+int serialize_add_employee_option(char **buf, char *cursor, size_t *capacity, char *add_employee_str)
 {
     char *name, *address;
     uint32_t hours;
@@ -147,8 +147,41 @@ int serialize_add_employee_request(char **buf, char *cursor, size_t *capacity, c
     return STATUS_SUCCESS;
 }
 
+int deserialize_add_employee_option(char **cursor, employee *e)
+{
+    // unpack length of name
+    uint16_t *name_len_ptr = (uint16_t *)(*cursor);
+    (*cursor) += sizeof(uint16_t);
+    uint16_t name_len = ntohs(*name_len_ptr);
 
-int serialize_update_employee_request(char **buf, char *cursor, size_t *capacity, char *update_employee_name, char *shours)
+    // allocate name of employee and write to it 
+    e->name = malloc(name_len + 1);
+    strncpy(e->name, (*cursor), name_len);
+    e->name[name_len] = '\0';
+    (*cursor) += name_len;
+
+    // unpack length of address
+    uint16_t *address_len_ptr = (uint16_t *)(*cursor);
+    uint16_t address_len = ntohs(*address_len_ptr);
+    (*cursor) += sizeof(uint16_t);
+
+    // allocate address of employee and write to it
+    e->address = malloc(address_len + 1);
+    strncpy(e->address, (*cursor), address_len);
+    e->address[address_len] = '\0';
+    (*cursor) += address_len;
+
+    // unpack hours
+    uint32_t *hours_ptr = (uint32_t *)(*cursor);
+    uint32_t hours = (uint32_t)ntohl(*hours_ptr);
+    e->hours = hours;
+    
+    return STATUS_SUCCESS;
+}
+
+
+
+int serialize_update_employee_option(char **buf, char *cursor, size_t *capacity, char *update_employee_name, char *shours)
 {
     // parse shours into a uint32_t
     uint32_t hours;
@@ -164,7 +197,6 @@ int serialize_update_employee_request(char **buf, char *cursor, size_t *capacity
         fprintf(stderr, "%s:%s:%d size of name exceeds allowed maximum", __FILE__, __FUNCTION__, __LINE__);
         return STATUS_ERROR;
     }
-
 
     // compute size of data to be written to buffer
     size_t data_len = sizeof(uint16_t) + sizeof(uint32_t) + name_len + 1;
@@ -209,7 +241,27 @@ int serialize_update_employee_request(char **buf, char *cursor, size_t *capacity
 }
 
 
-int serialize_delete_employee_request(char **buf, char *cursor, size_t *capacity, char *delete_employee_name)
+int deserialize_update_employee_option(char **cursor, char **employee_name, uint32_t *hours)
+{
+    // unpack name length from cursor
+    uint16_t *name_len_ptr = (uint16_t*)(*cursor);
+    uint16_t name_len = ntohs(*name_len_ptr);
+    (*cursor) += sizeof(uint16_t);
+
+    // write to employee's name
+    *employee_name = malloc(name_len + 1);
+    strncpy(*employee_name, *cursor, name_len);
+    (*employee_name)[name_len] = '\0';
+    (*cursor) += name_len;
+
+    // unpack hours for employee
+    *hours = (uint32_t)ntohl(*((uint32_t*)(*cursor)));
+    (*cursor) += sizeof(uint32_t);
+    return STATUS_SUCCESS;
+}
+
+
+int serialize_delete_employee_option(char **buf, char *cursor, size_t *capacity, char *delete_employee_name)
 {
     // compute length of employee name, and validate it does not exceed maximum
     size_t name_len = strlen(delete_employee_name);
@@ -255,7 +307,24 @@ int serialize_delete_employee_request(char **buf, char *cursor, size_t *capacity
     return STATUS_SUCCESS;
 }
 
-int serialize_list_request(char **buf, char *cursor, size_t *capacity)
+
+int deserialize_delete_employee_option(char **cursor, char **employee_name)
+{
+    // unpack name length
+    uint16_t *name_len_ptr = (uint16_t*)(*cursor);
+    uint16_t name_len = ntohs(*name_len_ptr);
+    (*cursor) += sizeof(uint16_t);
+
+    // allocate and write to employee name
+    *employee_name = malloc(name_len + 1);
+    strncpy(*employee_name, *cursor, name_len);
+    (*employee_name)[name_len] = '\0';
+    (*cursor) += name_len;
+    return STATUS_SUCCESS;
+}
+
+
+int serialize_list_option(char **buf, char *cursor, size_t *capacity)
 {
     // check that we have enough space to add a single character
     if (resize_request_buffer(buf, cursor, capacity, 1) == STATUS_ERROR)
