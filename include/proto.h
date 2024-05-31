@@ -16,13 +16,13 @@ typedef enum {
 
 int send_all(int socket, const void *buf, size_t buf_size, int flags);
 int receive_all(int socket, void *buf, size_t buf_size, int flags);
-int serialize_add_employee_option(char **buf, char *cursor, size_t *capacity, char *add_employee_str);
-int serialize_update_employee_option(char **buf, char *cursor, size_t *capacity, char *update_employee_name, char *shours);
-int serialize_delete_employee_option(char **buf, char *cursor, size_t *capacity, char *delete_employee_name);
-int serialize_list_option(char **buf, char *cusor, size_t *capacity);
-int deserialize_add_employee_option(char **cursor, employee *e);
-int deserialize_update_employee_option(char **cursor, char **employee_name, uint32_t *hours);
-int deserialize_delete_employee_option(char **cursor, char **employee_name);
+int serialize_add_employee_option(unsigned char **buf, unsigned char **cursor, size_t *capacity, char *add_employee_str);
+int serialize_update_employee_option(unsigned char **buf, unsigned char **cursor, size_t *capacity, char *update_employee_name, char *shours);
+int serialize_delete_employee_option(unsigned char **buf, unsigned char **cursor, size_t *capacity, char *delete_employee_name);
+int serialize_list_option(unsigned char **buf, unsigned char **cursor, size_t *capacity);
+int deserialize_add_employee_option(unsigned char **cursor, employee *e);
+int deserialize_update_employee_option(unsigned char **cursor, char **employee_name, uint32_t *hours);
+int deserialize_delete_employee_option(unsigned char **cursor, char **employee_name);
 
 
 

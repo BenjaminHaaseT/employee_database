@@ -50,27 +50,27 @@ int receive_all(int socket, void *buf, size_t buf_size, int flags)
     return total_bytes_recv;
 }
 
-int resize_request_buffer(char **buf, char *cursor, size_t *capacity, size_t data_len)
+int resize_request_buffer(unsigned char **buf, unsigned char **cursor, size_t *capacity, size_t data_len)
 {
     size_t delta;
-    if ((delta = *capacity - (cursor - (*buf))) < data_len)
+    if ((delta = *capacity - ((*cursor) - (*buf))) < data_len)
     {
-        size_t placeholder = (cursor - (*buf)); 
+        size_t placeholder = ((*cursor) - (*buf)); 
         *capacity += data_len - delta; 
-        char *new_buf = realloc(*buf, *capacity);
+        unsigned char *new_buf = realloc(*buf, *capacity);
         if (!new_buf)
         {
             fprintf(stderr, "%s:%s:%d error reallocating request buffer: (%d) %s failed\n", __FILE__, __FUNCTION__, __LINE__, errno, strerror(errno));
             return STATUS_ERROR;
         }
         *buf = new_buf;
-        cursor = (*buf) + placeholder;
+        (*cursor) = (*buf) + placeholder;
     }
 
     return STATUS_SUCCESS;
 }
 
-int serialize_add_employee_option(char **buf, char *cursor, size_t *capacity, char *add_employee_str)
+int serialize_add_employee_option(unsigned char **buf, unsigned char **cursor, size_t *capacity, char *add_employee_str)
 {
     char *name, *address;
     uint32_t hours;
@@ -105,83 +105,69 @@ int serialize_add_employee_option(char **buf, char *cursor, size_t *capacity, ch
     {
         return STATUS_ERROR;
     }
-//    size_t delta;
-//    if ((delta = capacity - (cursor - (*buf))) < data_len)
-//    {
-//        size_t placeholder = (cursor - (*buf)); 
-//        *capacity += data_len - delta; 
-//        char *new_buf = realloc(*buf, *capacity);
-//        if (!new_buf)
-//        {
-//            fprintf(stderr, "%s:%s:%d error reallocating request buffer: (%d) %s failed\n", __FILE__, __FUNCTION__, __LINE__, errno, strerror(errno));
-//            return STATUS_ERROR;
-//        }
-//        *buf = new_buf;
-//        cursor = (*buf) + placeholder;
-//    }
 
     // serialize the data
     // write option type
-    *cursor++ = 'a';
+    *(*cursor)++ = 'a';
     
     // write name length to buffer
-    *((uint16_t*)cursor) = (uint16_t)htons((uint16_t)name_len);
-    cursor += sizeof(uint16_t);
+    uint16_t name_len_n = (uint16_t)htons((uint16_t)name_len);
+    *((uint16_t *)(*cursor)) = name_len_n;
+
+    (*cursor) += sizeof(uint16_t);
 
     // write name to buffer
-    strncpy(cursor, name, name_len);
-    cursor += name_len;
+    strncpy((char*)(*cursor), name, name_len);
+    (*cursor) += name_len;
 
     // write address length to buffer
-    *((uint16_t*)cursor) = (uint16_t)htons((uint16_t)address_len);
-    cursor += sizeof(uint16_t);
+    *((uint16_t*)(*cursor)) = (uint16_t)htons((uint16_t)address_len);
+    (*cursor) += sizeof(uint16_t);
 
     // write address to buffer
-    strncpy(cursor, address, address_len);
-    cursor += address_len;
+    strncpy((char*)(*cursor), address, address_len);
+    (*cursor) += address_len;
 
     // write hours
-    *((uint32_t*)cursor) = (uint32_t)htonl(hours);
-    cursor += sizeof(uint32_t);
-    
+    *((uint32_t*)(*cursor)) = (uint32_t)htonl(hours);
+    (*cursor) += sizeof(uint32_t);
+
     return STATUS_SUCCESS;
 }
 
-int deserialize_add_employee_option(char **cursor, employee *e)
+int deserialize_add_employee_option(unsigned char **cursor, employee *e)
 {
     // unpack length of name
-    uint16_t *name_len_ptr = (uint16_t *)(*cursor);
+    uint16_t name_len = ntohs(*((uint16_t*)(*cursor)));
     (*cursor) += sizeof(uint16_t);
-    uint16_t name_len = ntohs(*name_len_ptr);
 
     // allocate name of employee and write to it 
     e->name = malloc(name_len + 1);
-    strncpy(e->name, (*cursor), name_len);
+    strncpy(e->name, (char*)(*cursor), name_len);
     e->name[name_len] = '\0';
     (*cursor) += name_len;
 
     // unpack length of address
-    uint16_t *address_len_ptr = (uint16_t *)(*cursor);
-    uint16_t address_len = ntohs(*address_len_ptr);
+    uint16_t address_len = ntohs(*((uint16_t *)(*cursor)));
     (*cursor) += sizeof(uint16_t);
 
     // allocate address of employee and write to it
     e->address = malloc(address_len + 1);
-    strncpy(e->address, (*cursor), address_len);
+    strncpy(e->address, (char*)(*cursor), address_len);
     e->address[address_len] = '\0';
     (*cursor) += address_len;
 
     // unpack hours
-    uint32_t *hours_ptr = (uint32_t *)(*cursor);
-    uint32_t hours = (uint32_t)ntohl(*hours_ptr);
+    uint32_t hours = ntohl(*((uint32_t*)(*cursor)));
     e->hours = hours;
+    (*cursor) += sizeof(uint32_t);
     
     return STATUS_SUCCESS;
 }
 
 
 
-int serialize_update_employee_option(char **buf, char *cursor, size_t *capacity, char *update_employee_name, char *shours)
+int serialize_update_employee_option(unsigned char **buf, unsigned char **cursor, size_t *capacity, char *update_employee_name, char *shours)
 {
     // parse shours into a uint32_t
     uint32_t hours;
@@ -207,61 +193,45 @@ int serialize_update_employee_option(char **buf, char *cursor, size_t *capacity,
         return STATUS_ERROR;
     }
 
-    //size_t delta;
-    //if ((delta = *capacity - (cursor - (*buf))) < data_len)
-    //{
-    //    size_t placeholder = (cursor - (*buf));
-    //    *capacity += data_len - delta;
-    //    char *new_buf = realloc(*buf, *capacity);
-    //    if (!new_buf)
-    //    {
-    //        fprintf(stderr, "%s:%s:%d error reallocating request buffer: (%d) %s\n", __FILE__, __FUNCTION__, __LINE__, errno, strerror(errno));
-    //        return STATUS_ERROR;
-    //    }
-    //    *buf = new_buf;
-    //    cursor = (*buf) + placeholder;
-    //}
-
     // write type of request to buffer
-    *cursor++ = 'u';
+    *(*cursor)++ = 'u';
 
     // write length of name to buffer
-    *((uint16_t*)cursor) = htons((uint16_t)name_len);
-    cursor += sizeof(uint16_t);
+    *((uint16_t*)(*cursor)) = htons((uint16_t)name_len);
+    (*cursor) += sizeof(uint16_t);
 
     // write name to buffer
-    strncpy(cursor, update_employee_name, name_len);
-    cursor += name_len;
+    strncpy((char*)(*cursor), update_employee_name, name_len);
+    (*cursor) += name_len;
 
     // write hours to buffer
-    *((uint32_t*)cursor) = (uint32_t)htonl(hours);
-    cursor += sizeof(uint32_t);
+    *((uint32_t*)(*cursor)) = htonl(hours);
+    (*cursor) += sizeof(uint32_t);
     
     return STATUS_SUCCESS;
 }
 
 
-int deserialize_update_employee_option(char **cursor, char **employee_name, uint32_t *hours)
+int deserialize_update_employee_option(unsigned char **cursor, char **employee_name, uint32_t *hours)
 {
     // unpack name length from cursor
-    uint16_t *name_len_ptr = (uint16_t*)(*cursor);
-    uint16_t name_len = ntohs(*name_len_ptr);
+    uint16_t name_len = ntohs(*((uint16_t*)(*cursor)));
     (*cursor) += sizeof(uint16_t);
 
     // write to employee's name
     *employee_name = malloc(name_len + 1);
-    strncpy(*employee_name, *cursor, name_len);
+    strncpy(*employee_name, (char*)(*cursor), name_len);
     (*employee_name)[name_len] = '\0';
     (*cursor) += name_len;
 
     // unpack hours for employee
-    *hours = (uint32_t)ntohl(*((uint32_t*)(*cursor)));
+    *hours = ntohl(*((uint32_t*)(*cursor)));
     (*cursor) += sizeof(uint32_t);
     return STATUS_SUCCESS;
 }
 
 
-int serialize_delete_employee_option(char **buf, char *cursor, size_t *capacity, char *delete_employee_name)
+int serialize_delete_employee_option(unsigned char **buf, unsigned char **cursor, size_t *capacity, char *delete_employee_name)
 {
     // compute length of employee name, and validate it does not exceed maximum
     size_t name_len = strlen(delete_employee_name);
@@ -277,76 +247,46 @@ int serialize_delete_employee_option(char **buf, char *cursor, size_t *capacity,
     {
         return STATUS_ERROR;
     }
-    // size_t delta;
-    // if ((delta = *capacity - (cursor - (*buf))) < data_len)
-    // {
-    //     size_t placeholder = (cursor - (*buf));
-    //     *capacity += data_len - delta;
-    //     char *new_buf = realloc(*buf, capacity);
-    //     if (!new_buf)
-    //     {
-    //         fprintf(stderr, "%s:%s:%d error reallocating request buffer: (%d) %s\n", __FILE__, __FUNCTION__, __LINE__, errno, strerror(errno));
-    //         return STATUS_ERROR;
-    //     }
-
-    //     *buf = new_buf;
-    //     cursor = (*buf) + placeholder;
-    // }
 
     // write option type to buffer
-    *cursor++ = 'd';
+    *(*cursor)++ = 'd';
     
     // write name length to buffer
-    *((uint16_t*)cursor) = (uint16_t)htons((uint16_t)name_len);
-    cursor += sizeof(uint16_t);
+    *((uint16_t*)(*cursor)) = htons((uint16_t)name_len);
+    (*cursor) += sizeof(uint16_t);
 
     // write name to buffer
-    strncpy(cursor, delete_employee_name, name_len);
-    cursor += name_len;
+    strncpy((char*)(*cursor), delete_employee_name, name_len);
+    (*cursor) += name_len;
 
     return STATUS_SUCCESS;
 }
 
 
-int deserialize_delete_employee_option(char **cursor, char **employee_name)
+int deserialize_delete_employee_option(unsigned char **cursor, char **employee_name)
 {
     // unpack name length
-    uint16_t *name_len_ptr = (uint16_t*)(*cursor);
-    uint16_t name_len = ntohs(*name_len_ptr);
+    uint16_t name_len = ntohs(*((uint16_t*)(*cursor)));
     (*cursor) += sizeof(uint16_t);
 
     // allocate and write to employee name
     *employee_name = malloc(name_len + 1);
-    strncpy(*employee_name, *cursor, name_len);
+    strncpy(*employee_name, (char*)(*cursor), name_len);
     (*employee_name)[name_len] = '\0';
     (*cursor) += name_len;
     return STATUS_SUCCESS;
 }
 
 
-int serialize_list_option(char **buf, char *cursor, size_t *capacity)
+int serialize_list_option(unsigned char **buf, unsigned char **cursor, size_t *capacity)
 {
     // check that we have enough space to add a single character
     if (resize_request_buffer(buf, cursor, capacity, 1) == STATUS_ERROR)
     {
         return STATUS_ERROR;
     }
-    // if (*capacity - (cursor - (*buf)) < 1)
-    // {
-    //     size_t placeholder = (cursor - (*buf));
-    //     (*capacity)++;
-    //     char *new_buf = realloc(*buf, capacity);
-    //     if (!new_buf)
-    //     {
-    //         fprintf(stderr, "%s:%s:%d error reallocating request buffer: (%d) %s\n", __FILE__, __FUNCTION__, __LINE__, errno, strerror(errno));
-    //         return STATUS_ERROR;
-    //     }
 
-    //     *buf = new_buf;
-    //     cursor = (*buf) + placeholder;
-    // }
-
-    *cursor++ = 'l';
+    *(*cursor)++ = 'l';
     return STATUS_SUCCESS;
 }
 
