@@ -151,14 +151,15 @@ int main(int argc, char *argv[])
     }
 
     // create buffer and cursor for serializing request
-     size_t capacity = sizeof(proto_msg) + sizeof(uint32_t);
-     char *buf = malloc(capacity);
-     char *cursor = buf + capacity;
+     size_t header_size = sizeof(proto_msg) + sizeof(uint32_t);
+     size_t capacity = header_size;
+     unsigned char *buf = malloc(capacity);
+     unsigned char *cursor = buf + capacity;
 
 	// serialize request's, writing to buffer
      if (add_employee_str)
      {
-        if (serialize_add_employee_option(&buf, cursor, &capacity, add_employee_str) == STATUS_ERROR)
+        if (serialize_add_employee_option(&buf, &cursor, &capacity, add_employee_str) == STATUS_ERROR)
         {
             fprintf(stderr, "unable to serialize add employee request\n");
             exit(1);
@@ -167,7 +168,7 @@ int main(int argc, char *argv[])
 
      if (update_employee_str && update_hours_str)
      {
-         if (serialize_update_employee_option(&buf, cursor, &capacity, update_employee_str, update_hours_str) == STATUS_ERROR)
+         if (serialize_update_employee_option(&buf, &cursor, &capacity, update_employee_str, update_hours_str) == STATUS_ERROR)
          {
              fprintf(stderr, "unable to serialize update employee request\n");
              exit(1);
@@ -181,7 +182,7 @@ int main(int argc, char *argv[])
 
     if (delete_employee_str)
     {
-        if (serialize_delete_employee_option(&buf, cursor, &capacity, delete_employee_str) == STATUS_ERROR)
+        if (serialize_delete_employee_option(&buf, &cursor, &capacity, delete_employee_str) == STATUS_ERROR)
         {
             fprintf(stderr, "unable to serialize delete employee request\n");
             exit(1);
@@ -190,14 +191,27 @@ int main(int argc, char *argv[])
 
     if (list_flag)
     {
-        if (serialize_list_option(&buf, cursor, &capacity) == STATUS_ERROR)
+        if (serialize_list_option(&buf, &cursor, &capacity) == STATUS_ERROR)
         {
             fprintf(stderr, "unable to serialize list request\n");
             exit(1);
         }
     }
 
+    // Compute total length of request data
+    size_t total_len = (size_t)(cursor - buf);
+    size_t data_len = total_len - header_size;
+  
+    // write length of data to header
+    cursor = buf + sizeof(proto_msg);
+    *((uint32_t*)(cursor)) = htonl((uint32_t)data_len);
+
 	// send request
+    if (send_all(sockfd, buf, total_len, 0) == STATUS_ERROR)
+    {
+        fprintf(stderr, "unable to send request to server\n");
+        exit(1);
+    }
 
 	// de-serialize and parse response
 
