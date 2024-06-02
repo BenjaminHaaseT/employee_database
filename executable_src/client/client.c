@@ -85,7 +85,7 @@ int main(int argc, char *argv[])
     // parse protocol version
     char *end = NULL;
     long parsed_protocol_version = strtol(protocol_version_str, &end, 10);
-    if (!end || *end != '\0' || parsed_protocol_version < 0)
+    if (!end || *end != '\0' || parsed_protocol_version < 0 || parsed_protocol_version > UINT16_MAX)
     {
         fprintf(stderr, "invalid protocol version\n");
         exit(1);
