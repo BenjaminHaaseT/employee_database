@@ -13,10 +13,14 @@
 #include "models.h"
 #include "proto.h"
 
+#define ALPHA 0.5L
+#define MAX_SERV_LEN 100
+
 
 void print_usage(char **argv);
 int get_listener_socket(char *address, char *port);
 int add_fd(struct pollfd *pfds, size_t *fd_count, nfds_t *fd_size);
+int receive_from_client(int client_fd, client_connection *conn);
 
 
 int main(int argc, char *argv[])
@@ -90,15 +94,91 @@ int main(int argc, char *argv[])
     size_t fd_size = 16;
     struct pollfd *pfds = malloc(fd_size * sizeof(struct pollfd));
 
-    if (add_fd(pfds, &fd_count, &fd_size) == STATUS_ERROR)
+    if (add_fd(&pfds, &fd_count, &fd_size) == STATUS_ERROR)
     {
         fprintf(stderr, "unable to add listener to file descriptor set\n");
         exit(1);
     }
 
+    // for mapping client file descriptors to client connection states
+    connection_map client_connections;
+    connection_map_init(&client_connections, ALPHA);
+
     // accpet loop
     while (1)
     {
+        int poll_count = poll(pfds, fd_count, -1);
+        if (poll_count == -1)
+        {
+            fprintf(stderr, "error polling sockets: (%d) %s\n", errno, strerror(errno));
+            exit(1);
+
+        }
+
+        for (size_t i = 0; i < fd_count; i++)
+        {
+            // check if socket is ready to be read from
+            if (pfds[i].revents & POLLIN)
+            {
+                if (pfds[i].fd == listener)
+                {
+                    // We are accepting a new client
+                    struct sockaddr_storage client_addr;
+                    socklen_t client_addrlen = sizeof(client_addr);
+                    int client_fd = accept(listener, (struct sockaddr *)&client_addr, &client_addrlen);
+
+                    // check if accepting failed
+                    if (client_fd == -1)
+                    {
+                        fprintf(stderr, "accepting client failed: (%d) %s\n", errno, strerror(errno));
+                        continue;
+                    }
+                    else
+                    {
+                        char client_addr_buf[INET6_ADDRSTRLEN];
+                        char client_serv_buf[MAX_SERV_LEN];
+                        int status = getnameinfo(
+                                (struct sockaddr *)&client_addr, client_addrlen, 
+                                client_addr_buf, INET6_ADDRSTRLEN, 
+                                client_serv_buf, MAX_SERV_LEN, NI_NUMERICHOST | NI_NUMERICSERV);
+
+                        if (status)
+                        {
+                            fprintf(stderr, "unable to get name info for client: %s\n", gai_strerror(status));
+                        }
+                        else
+                        {
+                            printf("accepting new connection from %s:%s\n", client_addr_buf, client_serv_buf);
+                        }
+
+                        // add new client to pfds and map client socket to new client connection
+                        if (add_fd(&pfds, &fd_count, &fd_size, client_fd) == STATUS_ERROR)
+                        {
+                            fprintf(stderr, "unable to add client file descriptor\n");
+                            exit(1);
+                        }
+
+                        // create new client connection for mapping
+                        client_connection *client_conn = malloc(sizeof(client_connection));
+                        client_connection_init(client_conn);
+                        connection_map_insert(&client_connections, client_fd, client_conn);
+                    }
+                }
+                else
+                {
+                    // we are reading from a client's socket
+
+
+                      
+
+
+
+
+
+                
+
+                    
+
     
 
 
@@ -198,6 +278,26 @@ int add_fd(struct pollfd **pfds, size_t *fd_count, nfds_t *fd_size, int fd)
     (*pfds)[*fd_count].events = POLLIN;
     (*fd_count)++;
 }
+
+int receive_from_client(int client_fd, client_connection *conn)
+{
+    if (conn->state == UNITIALIZED || conn->state == INITIALIZED)
+    {
+        // attempt to read client's request header
+        if (recv_all(client_fd, (void *)conn->header, sizeof(proto_msg), 0) == STATUS_ERROR)
+        {
+            fprintf("%s:%s:%d unable to read client's header\n", __FILE__, __FUNCTION__, __LINE__);
+            return STATUS_ERROR;
+        }
+        return STATUS_SUCCESS;
+    }
+    else 
+    {
+
+        
+        
+
+
 
 
 

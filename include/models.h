@@ -2,6 +2,7 @@
 #define MODELS_H
 
 #include <stdint.h>
+#include "proto.h"
 
 typedef enum {
     UNINITIALIZED,
@@ -16,6 +17,7 @@ typedef struct {
     client_state state;
 } client_connection;
 
+void client_connection_set_handshake_header(client_connection *conn);
 void client_connection_init(client_connection *conn);
 void free_client_connection(client_connetcion *conn);
 

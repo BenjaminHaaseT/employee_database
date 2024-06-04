@@ -3,8 +3,14 @@
 
 #include "models.h"
 
+void client_connection_set_handshake_header(client_connection *conn)
+{
+    conn->header = malloc(HANDSHAKE_REQ_SIZE);
+}
+
 void client_connection_init(client_connection *conn)
 {
+    conn->header = malloc(sizeof(proto_msg) + sizeof(uint32_t));
     conn->state = UNINITIALIZED;
 }
 
