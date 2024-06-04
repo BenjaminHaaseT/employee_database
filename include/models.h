@@ -6,7 +6,8 @@
 
 typedef enum {
     UNINITIALIZED,
-    INITIALIZED
+    INITIALIZED,
+    REQUEST,
 } client_state;
 
 typedef struct {

@@ -284,15 +284,29 @@ int receive_from_client(int client_fd, client_connection *conn)
     if (conn->state == UNITIALIZED || conn->state == INITIALIZED)
     {
         // attempt to read client's request header
-        if (recv_all(client_fd, (void *)conn->header, sizeof(proto_msg), 0) == STATUS_ERROR)
+        int nbytes_read = 0;
+        if ((nbytes_read = receive_all(client_fd, conn->header, sizeof(proto_msg) + sizeof(uint32_t), 0)) == STATUS_ERROR)
         {
             fprintf("%s:%s:%d unable to read client's header\n", __FILE__, __FUNCTION__, __LINE__);
             return STATUS_ERROR;
         }
-        return STATUS_SUCCESS;
+        return nbytes_read;
     }
     else 
     {
+        size_t bytes_rem = conn->buf_size - (size_t)(conn->cursor - conn->buf);
+        if (recv(client_fd, conn->cursor, bytes_rem, 0) == STATUS_ERROR)
+        {
+            fprintf("%s:%s:%d unable to read client's request data\n", __FILE__, __FUNCTION__, __LINE__);
+            return STATUS_ERROR;
+        }
+        return (int)(conn->cursor - conn->buf);
+    }
+}
+
+            
+
+
 
         
         
@@ -304,4 +318,3 @@ int receive_from_client(int client_fd, client_connection *conn)
 
 
     
-
