@@ -21,6 +21,7 @@ void print_usage(char **argv);
 int get_listener_socket(char *address, char *port);
 int add_fd(struct pollfd *pfds, size_t *fd_count, nfds_t *fd_size);
 int receive_from_client(int client_fd, client_connection *conn);
+int send_handshake_response(int client_fd, unsigned char flag);
 
 
 int main(int argc, char *argv[])
@@ -80,6 +81,7 @@ int main(int argc, char *argv[])
         fprintf(stderr, "invalid protocol version %l\n", parsed_protocol_version);
         exit(1);
     }
+
 
     // get listener for accepting new connections
     int listener = get_listener_socket(address, port);
@@ -166,7 +168,53 @@ int main(int argc, char *argv[])
                 }
                 else
                 {
-                    // we are reading from a client's socket
+                    // get client connection from map
+                    if (!connection_map_contains(&client_connections, pfds[i].fd))
+                    {
+                        fprintf(stderr, "invalid client file descriptor\n");
+                        exit(1);
+                    }
+
+                    client_connection *conn = connection_map_get(&client_connections, pfds[i].fd);
+
+                    // read into clients buffer
+                    int nbytes_read;
+                    if ((nbytes_read = receive_from_client(pfds[i].fd, conn)) == STATUS_ERROR)
+                    {
+                        fprintf(stderr, "unable to read from client's socket\n");
+                        exit(1);
+                    }
+
+                    // check state of client, and proceed accordingly
+                    if (conn->state == UNITIALIZED)
+                    {
+                        // check protocol version matches
+                        uint16_t client_proto_version = ntohs(*(uint16_t *)(conn->header + sizeof(proto_msg)));
+                        unsigned char flag;
+                        if (client_proto_version != parsed_protocol_version)
+                        {
+                            flag = 0;
+                        }
+                        else
+                        {
+                            // transition conn into initialized state
+                            conn->state = INITIALIZED;
+                            flag = 1;
+                        }
+
+                        if (send_handshake_response(pfds[i].fd, flag) == STATUS_ERROR)
+                        {
+                            fprintf(stderr, "%s:%s:%d send_handshake_response() failed\n", __FILE__, __FUNCTION__, __LINE__);
+                            exit(1);
+                        }
+                    }
+                    else if (conn->state == INITIALIZED)
+                    {
+
+
+
+
+
 
 
                       
@@ -281,30 +329,67 @@ int add_fd(struct pollfd **pfds, size_t *fd_count, nfds_t *fd_size, int fd)
 
 int receive_from_client(int client_fd, client_connection *conn)
 {
-    if (conn->state == UNITIALIZED || conn->state == INITIALIZED)
+    if (conn->state == UNINITIALIZED)
     {
-        // attempt to read client's request header
+        size_t bytes_rem = sizeof(proto_msg) + sizeof(uint16_t) - (size_t)(conn->header_cursor - conn->header);
         int nbytes_read = 0;
-        if ((nbytes_read = receive_all(client_fd, conn->header, sizeof(proto_msg) + sizeof(uint32_t), 0)) == STATUS_ERROR)
+        if ((nbytes_read = recv(client_fd, conn->header_cursor, bytes_rem, 0)) == STATUS_ERROR)
         {
-            fprintf("%s:%s:%d unable to read client's header\n", __FILE__, __FUNCTION__, __LINE__);
+            fprintf(stderr, "%s:%s:%d unable to receive header bytes from client's socket\n", __FILE__, __FUNCTION__, __LINE__);
             return STATUS_ERROR;
         }
+        
+        if (nbytes_read == 0) return 0;     // client has terminated their connection
+
+        // adjust cursor and return bytes read
+        conn->header_cursor += nbytes_read;
         return nbytes_read;
     }
-    else 
+    else if (conn->state == INITIALIZED)
     {
-        size_t bytes_rem = conn->buf_size - (size_t)(conn->cursor - conn->buf);
-        if (recv(client_fd, conn->cursor, bytes_rem, 0) == STATUS_ERROR)
+        size_t header_bytes_rem = sizeof(proto_msg) + sizeof(uint32_t) - (size_t)(conn->header_cursor - conn->header);
+        int nbytes_read = 0;
+        if ((nbytes_read = recv(client_fd, conn->header_cursor, header_bytes_rem, 0)) == STATUS_ERRROR)
         {
-            fprintf("%s:%s:%d unable to read client's request data\n", __FILE__, __FUNCTION__, __LINE__);
+            fprintf(stderr, "%s:%s:%d unable to receive header bytes from client's socket\n", __FILE__, __FUNCTION__, __LINE__);
             return STATUS_ERROR;
         }
-        return (int)(conn->cursor - conn->buf);
-    }
+
+        if (nbytes_read == 0) return 0;
+
+        // adjust header cursor and check if header has been completely read
+        conn->header_cursor += nbytes_read;
+        if (conn->header_cursor - conn->header == sizeof(proto_msg) + sizeof(uint32_t))
+        {
+
+
+
+
+
+
 }
 
             
+int send_handshake_response(int client_fd, unsigned char flag)
+{
+    // allocate buffer and serialize response data
+    unsigned char *response_buffer = malloc(sizeof(proto_msg) + 1);
+    *(proto_msg*)(response_buffer) = HANDSHAKE_RESPONSE;
+    *(response_buffer + sizeof(proto_msg)) = flag;
+
+    // send response to client
+    if (send_all(client_fd, response_buffer, sizeof(proto_msg) + 1, 0) == STATUS_ERRRO)
+    {
+        fprintf(stderr, "%s:%s:%d unable to send handshake response to client\n", __FILE__, __FUNCTION__, __LINE__);
+        return STATUS_ERROR;
+    }
+
+    return STATUS_SUCCESS;
+}
+
+    
+
+
 
 
 

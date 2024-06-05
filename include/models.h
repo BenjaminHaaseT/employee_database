@@ -5,15 +5,16 @@
 #include "proto.h"
 
 typedef enum {
-    UNINITIALIZED,
-    INITIALIZED,
-    REQUEST,
+    UNINITIALIZED,  /* Connected but handshake has not been confirmed */
+    INITIALIZED,    /* Protocol version has been validated, waiting to read request */
+    REQUEST,        /* Processing request */
 } client_state;
 
 typedef struct {
     unsigned char *header;
+    unsigned char *header_cursor;
     unsigned char *buf;
-    unsigned char *cursor;
+    unsigned char *buf_cursor;
     size_t buf_size;
     client_state state;
 } client_connection;
