@@ -154,6 +154,8 @@ int main(int argc, char *argv[])
                         }
 
                         // add new client to pfds and map client socket to new client connection
+
+                        size_t conn_idx = fd_count;
                         if (add_fd(&pfds, &fd_count, &fd_size, client_fd) == STATUS_ERROR)
                         {
                             fprintf(stderr, "unable to add client file descriptor\n");
@@ -162,7 +164,7 @@ int main(int argc, char *argv[])
 
                         // create new client connection for mapping
                         client_connection *client_conn = malloc(sizeof(client_connection));
-                        client_connection_init(client_conn);
+                        client_connection_init(client_conn, conn_idx);
                         connection_map_insert(&client_connections, client_fd, client_conn);
                     }
                 }
@@ -178,38 +180,80 @@ int main(int argc, char *argv[])
                     client_connection *conn = connection_map_get(&client_connections, pfds[i].fd);
 
                     // read into clients buffer
-                    int nbytes_read;
+                    int nbytes_read = 0;
                     if ((nbytes_read = receive_from_client(pfds[i].fd, conn)) == STATUS_ERROR)
                     {
-                        fprintf(stderr, "unable to read from client's socket\n");
+                        fprintf(stderr, "receive_from_client() failed\n");
                         exit(1);
                     }
-
-                    // check state of client, and proceed accordingly
-                    if (conn->state == UNITIALIZED)
+                    else if (nbytes_read == 0)
                     {
-                        // check protocol version matches
-                        uint16_t client_proto_version = ntohs(*(uint16_t *)(conn->header + sizeof(proto_msg)));
-                        unsigned char flag;
-                        if (client_proto_version != parsed_protocol_version)
+                        // client's connection has terminated
+                        printf("client disconnected\n");
+                        size_t conn_idx = conn->conn_idx;
+                        free_client_connection(conn);
+                        remove_fd(pfds, &fd_count conn_idx);
+                        connection_map_remove(&client_connections, pfds[i].fd);
+                    }
+                    else if (conn->state == UNINITIALIZED && nbytes_read == sizeof(proto_msg) + sizeof(uint16_t))
+                    {
+                        // check message type
+                        proto_msg msg_type = *(proto_msg *)(conn->header);
+                        if (msg_type != HANDSHAKE_REQUEST)
                         {
-                            flag = 0;
+                            fprintf(stderr, "illegal message type received from client\n");
+                            // send error
+                           if (send_handshake_response(pfds[i].fd, 0) == STATUS_ERROR)
+                           {
+                               fprintf("send_handshake_response() failed\n");
+                           }
                         }
                         else
                         {
-                            // transition conn into initialized state
-                            conn->state = INITIALIZED;
-                            flag = 1;
-                        }
+                            uint16_t client_protocol_version = ntohs(*(uint16_t *)(conn->header + sizeof(proto_msg)));
+                            int flag;
+                            if (client_protocol_version != parsed_protocol_version)
+                            {
+                                flag = 0;
+                            }
+                            else
+                            {
+                                flag = 1;
+                                conn->state = INITIALIZED;
+                                conn->header_cursor = conn->header;
+                            }
 
-                        if (send_handshake_response(pfds[i].fd, flag) == STATUS_ERROR)
-                        {
-                            fprintf(stderr, "%s:%s:%d send_handshake_response() failed\n", __FILE__, __FUNCTION__, __LINE__);
-                            exit(1);
+                           if (send_handshake_response(pfds[i].fd, flag) == STATUS_ERROR)
+                           {
+                               fprintf("send_handshake_response() failed\n");
+                           }
                         }
                     }
-                    else if (conn->state == INITIALIZED)
+                    else if (conn->state == INITIALIZED && nbytes_read == sizeof(proto_msg) + sizeof(uint32_t))
                     {
+                        // parse message type 
+                        proto_msg msg_type = *(proto_msg *)(conn->header);
+                        if (msg_type != DB_ACCESS_REQUEST)
+                        {
+                            fprintf(stderr, "illegal message type received from client\n");
+                            // TODO: send error
+                        }
+
+
+                        // parse data length and allocate buffer for connection
+
+                        // transition state of connection
+
+                        // attempt to read anymore bytes into data buffer from clients socket
+
+
+                    }
+                    else if (conn->state == REQUEST && nbytes_read == 
+
+                        
+
+
+
 
 
 
@@ -325,7 +369,14 @@ int add_fd(struct pollfd **pfds, size_t *fd_count, nfds_t *fd_size, int fd)
     (*pfds)[*fd_count].fd = fd;
     (*pfds)[*fd_count].events = POLLIN;
     (*fd_count)++;
+    return STATUS_SUCCESS;
 }
+
+void remove_fd(struct pollfd *pfds, size_t *fd_count, size_t conn_idx)
+{
+    pfds[conn_idx] = pfds[--(*fd_count)];
+}
+
 
 int receive_from_client(int client_fd, client_connection *conn)
 {
@@ -333,25 +384,25 @@ int receive_from_client(int client_fd, client_connection *conn)
     {
         size_t bytes_rem = sizeof(proto_msg) + sizeof(uint16_t) - (size_t)(conn->header_cursor - conn->header);
         int nbytes_read = 0;
-        if ((nbytes_read = recv(client_fd, conn->header_cursor, bytes_rem, 0)) == STATUS_ERROR)
+        if ((nbytes_read = recv(client_fd, conn->header_cursor, bytes_rem, 0)) == -1)
         {
-            fprintf(stderr, "%s:%s:%d unable to receive header bytes from client's socket\n", __FILE__, __FUNCTION__, __LINE__);
+            fprintf(stderr, "%s:%s:%d unable to receive header bytes from client's socket: (%d) %s\n", __FILE__, __FUNCTION__, __LINE__, errno, strerror(errno));
             return STATUS_ERROR;
         }
         
         if (nbytes_read == 0) return 0;     // client has terminated their connection
 
-        // adjust cursor and return bytes read
+        // adjust cursor and return total bytes that have been read so far
         conn->header_cursor += nbytes_read;
-        return nbytes_read;
+        return (int)(conn->header_cursor - conn->header);
     }
     else if (conn->state == INITIALIZED)
     {
         size_t header_bytes_rem = sizeof(proto_msg) + sizeof(uint32_t) - (size_t)(conn->header_cursor - conn->header);
         int nbytes_read = 0;
-        if ((nbytes_read = recv(client_fd, conn->header_cursor, header_bytes_rem, 0)) == STATUS_ERRROR)
+        if ((nbytes_read = recv(client_fd, conn->header_cursor, header_bytes_rem, 0)) == -1)
         {
-            fprintf(stderr, "%s:%s:%d unable to receive header bytes from client's socket\n", __FILE__, __FUNCTION__, __LINE__);
+            fprintf(stderr, "%s:%s:%d unable to receive header bytes from client's socket: (%d) %s\n", __FILE__, __FUNCTION__, __LINE__, errno, strerror(errno));
             return STATUS_ERROR;
         }
 
@@ -359,8 +410,51 @@ int receive_from_client(int client_fd, client_connection *conn)
 
         // adjust header cursor and check if header has been completely read
         conn->header_cursor += nbytes_read;
-        if (conn->header_cursor - conn->header == sizeof(proto_msg) + sizeof(uint32_t))
+        return (int)(conn->header_cursor - conn->header);
+    }
+    else
+    {
+        // for keeping track of how many bytes to read and how many bytes were read
+        size_t buf_bytes_rem = conn->buf_size - (size_t)(conn->buf_cursor - conn->buf); 
+        int nbytes_read = 0;
+
+        if ((nbytes_read = recv(client_fd, conn->buf_cursor, buf_bytes_rem, 0)) == -1)
         {
+            fprintf(stderr, "%s:%s:%d unable to receive data bytes from client's socket: (%d) %s\n", __FILE__, __FUNCTION__, __LINE__);
+            return STATUS_ERROR;
+        }
+
+        // client has ended connection early
+        if (nbytes_read == 0) return 0;
+
+        return (int)(conn->buf_cursor - conn->buf);
+    }
+        
+        
+
+        //if (conn->header_cursor - conn->header == sizeof(proto_msg) + sizeof(uint32_t))
+        //{
+        //    // ensure tag contains correct type
+        //    proto_msg msg_type = *(proto_msg*)(conn->header);
+        //    if (msg_type != DB_ACCESS_REQUEST)
+        //    {
+        //        fprintf(stderr, "%s:%s:%d illegal message type\n", __FILE__, __FUNCTION__, __LINE__);
+        //        return STATUS_ERROR;
+        //    }
+
+        //    // transistion state for conn, client is now ready to read data from socket
+        //    conn->state = REQUEST;
+
+        //    // parse length of data and allocate buffer for data
+        //    uint32_t data_len = ntohl(*(uint32_t*)(conn->header + sizeof(proto_msg)));
+        //    conn->buf = malloc(data_len);
+        //    conn->cursor = conn->buf;
+
+
+
+            
+
+
 
 
 
@@ -383,6 +477,8 @@ int send_handshake_response(int client_fd, unsigned char flag)
         fprintf(stderr, "%s:%s:%d unable to send handshake response to client\n", __FILE__, __FUNCTION__, __LINE__);
         return STATUS_ERROR;
     }
+
+    free(response_buffer);
 
     return STATUS_SUCCESS;
 }

@@ -8,11 +8,12 @@ void client_connection_set_handshake_header(client_connection *conn)
     conn->header = malloc(HANDSHAKE_REQ_SIZE);
 }
 
-void client_connection_init(client_connection *conn)
+void client_connection_init(client_connection *conn, size_t conn_idx)
 {
     conn->header = malloc(sizeof(proto_msg) + sizeof(uint32_t));
     conn->header_cursor = conn->header;
     conn->state = UNINITIALIZED;
+    conn->conn_idx = conn_idx;
 }
 
 void free_client_connection(client_connetcion *conn)

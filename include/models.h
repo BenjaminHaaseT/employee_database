@@ -16,11 +16,12 @@ typedef struct {
     unsigned char *buf;
     unsigned char *buf_cursor;
     size_t buf_size;
+    size_t conn_idx;
     client_state state;
 } client_connection;
 
 void client_connection_set_handshake_header(client_connection *conn);
-void client_connection_init(client_connection *conn);
+void client_connection_init(client_connection *conn, size_t conn_idx);
 void free_client_connection(client_connetcion *conn);
 
 // for defining hashmap
