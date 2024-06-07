@@ -290,6 +290,83 @@ int serialize_list_option(unsigned char **buf, unsigned char **cursor, size_t *c
     return STATUS_SUCCESS;
 }
 
+int deserialize_request_options(int fd, employee **employees, db_header *dbhdr, unsigned char **response_buf, unsigned char *request_cursor)
+{
+    if ((char)(*request_cursor) == 'a')
+    {
+        // we need to deserialize an add employee request
+        request_cursor++;
+
+        // add space for new employee
+        dbdhr->employee_count++;
+        employee *new_employees = realloc(*employees, dbhdr->employee_count);
+        if (!new_employees)
+        {
+            fprintf(stderr, "%s:%s:%d error reallocating employee buffer\n", __FILE__, __FUNCTION__, __LINE__);
+            return STATUS_ERROR;
+        }
+
+        (*employees) = new_employees;
+
+        // attempt to deserialize add employee request
+        if (deserialize_add_employee_option(&request_cursor, (*employees) + (dbhdr->employee_count - 1)) == STATUS_ERROR)
+        {
+            fprintf(stderr, "%s:%s:%d deserialize_add_employee_option() failed\n", __FILE__, __FUNCTION__, __LINE__);
+            return STATUS_ERROR;
+        }
+
+        // write to file
+        if (write_db(fd, dbhdr, *employees) == STATUS_ERROR)
+        {
+            fprintf(stderr, "%s:%s:%d write_db() failed\n", __FILE__, __FUNCTION__, __LINE__);
+            return STATUS_ERROR;
+        }
+    }
+    else if ((char)(*request_cursor) == 'u')
+    {
+        // attempt to deserialize update option from request
+        request_cursor++;
+        uint32_t hours;
+        char *employee_name;
+
+        if (deserialize_update_employee_option(&request_cursor, &employee_name, &hours) == STATUS_ERROR)
+        {
+            fprintf(stderr, "%s:%s:%d deserialize_update_employee_option() failed\n", __FILE__, __FUNCTION__, __LINE__);
+            return STATUS_ERROR;
+        }
+
+        // search for employee
+        bool found = false;
+        for (size_t i = 0; i < dbhdr->employee_count; i++)
+        {
+            if (!strcmp((*employees)[i].name, employee_name))
+            {
+                found = true;
+                (*employees)[i].hours = hours;
+                break;
+            }
+        }
+
+        if (!found)
+        {
+            
+
+
+
+
+
+
+
+
+
+
+
+
+
+}
+
+
+
         
 
 

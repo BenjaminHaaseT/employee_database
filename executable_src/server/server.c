@@ -8,8 +8,15 @@
 #include <errno.h>
 #include <unistd.h>
 #include <poll.h>
+#include <stdbool.h>
+#include <fcntl.h>
+#include <sys/types.h>
+#include <sys/uio.h>
+#include <sys/stat.h>
 
 #include "common.h"
+#include "serialize.h"
+#include "parse.h"
 #include "models.h"
 #include "proto.h"
 
@@ -26,7 +33,7 @@ int send_handshake_response(int client_fd, unsigned char flag);
 
 int main(int argc, char *argv[])
 {
-    if (argc < 4)
+    if (argc < 5)
     {
         print_usage(argv);
         exit(0);
@@ -36,9 +43,11 @@ int main(int argc, char *argv[])
     char *address = NULL;
     char *port = NULL;
     char *protocol_version_str = NULL;
+    char *fname = NULL;
+    bool new_file_flag = false;
     int c;
 
-    while ((c = getopt(argc, argv, ":a:p:v:")) != -1)
+    while ((c = getopt(argc, argv, ":f:a:p:v:n")) != -1)
     {
         switch (c)
         {
@@ -50,6 +59,12 @@ int main(int argc, char *argv[])
                 break;
             case 'v':
                 protocol_version_str = optarg;
+                break;
+            case 'f':
+                fname = optarg;
+                break;
+            case 'n':
+                new_file_flag = optarg;
                 break;
             case ':':
                 fprintf(stderr, "missing argument value\n");
@@ -66,10 +81,54 @@ int main(int argc, char *argv[])
         }
     }
 
-    // verify command line arguments have non null values
-    if (!address || !port || !protocol_version_str)
+    // verify required command line arguments have non null values
+    if (!address || !port || !protocol_version_str || !fname)
     {
         print_usage(argv);
+        exit(1);
+    }
+
+    // open database file
+    int fd;
+    if (new_file_flag)
+    {
+        if ((fd = open(fname, O_RDWR | O_CREAT | O_EXCL, 0666)) == -1)
+        {
+            fprintf(stderr, "%s:%s:%d - error creating new file '%s' : (%d) %s\n", __FILE__, __FUNCTION__, __LINE__, fname, errno, strerror(errno));
+            exit(1);
+        }
+        if (write_new_file_hdr(fd) == STATUS_ERROR) 
+        {
+            exit(1);
+        }
+		// reset file cursor to beginning
+		if (lseek(fd, 0, SEEK_SET) == -1)
+		{
+			fprintf(stderr, "%s:%s:%d - unable to reset file cursor: (%d) %s\n", __FILE__, __FUNCTION__, __LINE__, errno, strerror(errno));
+			exit(1);
+		}
+    }
+    else
+    {
+        if ((fd = open(fname, O_RDWR, 0666)) == -1)
+        {
+            fprintf(stderr, "%s:%s:%d - unable to open file %s: (%d) %s\n", __FILE__, __FUNCTION__, __LINE__, fname, errno, strerror(errno));
+            exit(1);
+        }
+    }
+    
+    // Read database file header and stats from file
+    db_header dbhdr;
+    if(read_dbhdr(fd, &dbhdr) == STATUS_ERROR)
+    {
+        exit(1);
+    }
+
+    // Read employees from data base
+    size_t employees_size = dbhdr.employee_count;      
+    employee *employees = (employee *) malloc(sizeof(employee) * employees_size);
+    if (read_employees(fd, &employees, employees_size) == STATUS_ERROR)
+    {
         exit(1);
     }
 
@@ -202,7 +261,7 @@ int main(int argc, char *argv[])
                         if (msg_type != HANDSHAKE_REQUEST)
                         {
                             fprintf(stderr, "illegal message type received from client\n");
-                            // send error
+                            // TODO: send error response
                            if (send_handshake_response(pfds[i].fd, 0) == STATUS_ERROR)
                            {
                                fprintf("send_handshake_response() failed\n");
@@ -214,11 +273,11 @@ int main(int argc, char *argv[])
                             int flag;
                             if (client_protocol_version != parsed_protocol_version)
                             {
-                                flag = 0;
+                                flag = 1;
                             }
                             else
                             {
-                                flag = 1;
+                                flag = 0;
                                 conn->state = INITIALIZED;
                                 conn->header_cursor = conn->header;
                             }
@@ -236,19 +295,34 @@ int main(int argc, char *argv[])
                         if (msg_type != DB_ACCESS_REQUEST)
                         {
                             fprintf(stderr, "illegal message type received from client\n");
-                            // TODO: send error
+                            // TODO: send error response to client
                         }
 
 
-                        // parse data length and allocate buffer for connection
+                        // parse data length and allocate buffer response data
+                        uint32_t data_len = ntohl(*(uint32_t *)(conn->header + sizeof(proto_msg)));
+                        conn->buf = malloc(data_len);
+                        conn->buf_cursor = conn->buf;
+                        conn->buf_size = (size_t) data_len;
 
                         // transition state of connection
+                        conn->state = REQUEST;
 
-                        // attempt to read anymore bytes into data buffer from clients socket
-
-
+                        // attempt to read any remaining bytes from client's socket just in more were able to get sent
+                        // reset 'nbytes_read' to zero to keep track of bytes read from the request
+                        nbytes_read = 0;
+                        if ((nbytes_read = receive_from_client(pfds[i].fd, conn)) == STATUS_ERROR)
+                        {
+                            fprintf(stderr, "receive_from_client() failed\n");
+                            exit(1);
+                        }
                     }
-                    else if (conn->state == REQUEST && nbytes_read == 
+
+                    // Check if connection has been transistioned/or is in, request state and all bytes of request have been processed
+                    if (conn->state == REQUEST && nbytes_read == conn->buf_size)
+                    {
+                        // once this state is reached process request and reset state of connection
+
 
                         
 
@@ -274,8 +348,7 @@ int main(int argc, char *argv[])
     
 
 
-
-    }
+}
 
     
 
@@ -288,10 +361,12 @@ int main(int argc, char *argv[])
 
 void print_usage(char **argv)
 {
-    printf("usage: %s -a <ADDRESS> -p <PORT> -v <VERSION>\n", argv[0]);
-    printf("-a <ADDRESS>: the address of the server\n");
-    printf("-p <PORT>: the port of the server\n");
-    printf("-v <VERSION>: the protocol version\n");
+    printf("usage: %s -f <FILE> -a <ADDRESS> -p <PORT> -v <VERSION>\n", argv[0]);
+    printf("-f <FILE>: (REQUIRED) the file of the database\n");
+    printf("-a <ADDRESS>: (REQUIRED) the address of the server\n");
+    printf("-p <PORT>:  (REQUIRED) the port of the server\n");
+    printf("-v <VERSION>: (REQUIRED) the protocol version\n");
+    printf("-n : (OPTIONAL) flag to create a new file\n");
 }
 
 

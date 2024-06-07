@@ -150,6 +150,8 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
+    free(handshake_response);
+
     // create buffer and cursor for serializing request
      size_t header_size = sizeof(proto_msg) + sizeof(uint32_t);
      size_t capacity = header_size;
