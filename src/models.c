@@ -14,12 +14,14 @@ void client_connection_init(client_connection *conn, size_t conn_idx)
     conn->header_cursor = conn->header;
     conn->state = UNINITIALIZED;
     conn->conn_idx = conn_idx;
+    conn->buf = NULL;
 }
 
 void free_client_connection(client_connetcion *conn)
 {
-    free(conn->buf);
     free(con->header);
+    if (conn->buf)
+        free(conn->buf);
     free(conn);
 }
 

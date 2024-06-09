@@ -155,7 +155,7 @@ int main(int argc, char *argv[])
     size_t fd_size = 16;
     struct pollfd *pfds = malloc(fd_size * sizeof(struct pollfd));
 
-    if (add_fd(&pfds, &fd_count, &fd_size) == STATUS_ERROR)
+    if (add_fd(&pfds, &fd_count, &fd_size, listener) == STATUS_ERROR)
     {
         fprintf(stderr, "unable to add listener to file descriptor set\n");
         exit(1);
@@ -232,7 +232,7 @@ int main(int argc, char *argv[])
                     // get client connection from map
                     if (!connection_map_contains(&client_connections, pfds[i].fd))
                     {
-                        fprintf(stderr, "invalid client file descriptor\n");
+                        fprintf(stderr, "client file descriptor not found in map\n");
                         exit(1);
                     }
 
@@ -251,7 +251,7 @@ int main(int argc, char *argv[])
                         printf("client disconnected\n");
                         size_t conn_idx = conn->conn_idx;
                         free_client_connection(conn);
-                        remove_fd(pfds, &fd_count conn_idx);
+                        remove_fd(pfds, &fd_count, conn_idx);
                         connection_map_remove(&client_connections, pfds[i].fd);
                         continue;
                     }
@@ -328,18 +328,26 @@ int main(int argc, char *argv[])
                         unsigned char *response_buf = malloc(response_buf_size);
                         *(proto_msg *)(response_buf) = DB_ACCESS_RESPONSE;
 
+                        // process request and write to response buffer depending on options requested
                         if (deserialize_request_options(fd, &employees, &dbhdr, &response_buf, &response_buf_size, conn) == STATUS_ERROR)
                         {
                             fprintf(stderr, "deserialize_request_options() failed\n");
                             exit(1);
                         }
 
-                        // process request and write to response buffer depending on options requested
-
                         // send response back to client
+                        if (send_all(pfds[i].fd, response_buf, response_buf_size, 0) == STATUS_ERROR)
+                        {
+                            fprintf(stderr, "send_all() failed\n");
+                            exit(1);
+                        }
 
                         // reset client, reset header and buf cursor's and state to initialized
-
+                        conn->state = INITIALIZED;
+                        conn->header_cursor = conn->header;
+                        free(conn->buf);
+                        conn->buf = NULL;
+                        conn->buf_header = NULL;
                     }
                 }
 
