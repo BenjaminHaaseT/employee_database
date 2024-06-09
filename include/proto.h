@@ -4,6 +4,7 @@
 #include "parse.h"
 #include "common.h"
 #include "serialize.h"
+#include "models.h"
 
 typedef enum {
     HANDSHAKE_REQUEST,  /* Request from a client to connect to the server, includes protocol version */

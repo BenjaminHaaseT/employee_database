@@ -2,7 +2,6 @@
 #define MODELS_H
 
 #include <stdint.h>
-#include "proto.h"
 
 typedef enum {
     UNINITIALIZED,  /* Connected but handshake has not been confirmed */
@@ -22,7 +21,7 @@ typedef struct {
 
 void client_connection_set_handshake_header(client_connection *conn);
 void client_connection_init(client_connection *conn, size_t conn_idx);
-void free_client_connection(client_connetcion *conn);
+void free_client_connection(client_connection *conn);
 
 // for defining hashmap
 #define FNV_OFFSET 14695981039346656037UL
@@ -34,7 +33,7 @@ struct map_node {
     int key;
     client_connection *conn;
     struct map_node *next
-}; 
+} 
 
 typedef struct {
     struct mape_node **table;
