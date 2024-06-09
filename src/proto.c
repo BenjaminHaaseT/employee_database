@@ -290,15 +290,20 @@ int serialize_list_option(unsigned char **buf, unsigned char **cursor, size_t *c
     return STATUS_SUCCESS;
 }
 
-int deserialize_request_options(int fd, employee **employees, db_header *dbhdr, unsigned char **response_buf, unsigned char *request_cursor)
+int deserialize_request_options(int fd, employee **employees, db_header *dbhdr, unsigned char **response_buf, client_connection *conn)
 {
-    if ((char)(*request_cursor) == 'a')
+    // set cursor to beginning of request buffer
+    conn->buf_cursor = conn->buf;
+
+    // check for add employee option
+    if ((size_t)(conn->buf_cursor - conn->buf) < conn->buf_size && *conn->buf_cursor == 'a')
     {
         // we need to deserialize an add employee request
-        request_cursor++;
+        // move cursor past option character
+        conn->buf_cursor++;
 
         // add space for new employee
-        dbdhr->employee_count++;
+        dbhdr->employee_count++;
         employee *new_employees = realloc(*employees, dbhdr->employee_count);
         if (!new_employees)
         {
@@ -309,7 +314,7 @@ int deserialize_request_options(int fd, employee **employees, db_header *dbhdr, 
         (*employees) = new_employees;
 
         // attempt to deserialize add employee request
-        if (deserialize_add_employee_option(&request_cursor, (*employees) + (dbhdr->employee_count - 1)) == STATUS_ERROR)
+        if (deserialize_add_employee_option(&conn->buf_cursor, (*employees) + (dbhdr->employee_count - 1)) == STATUS_ERROR)
         {
             fprintf(stderr, "%s:%s:%d deserialize_add_employee_option() failed\n", __FILE__, __FUNCTION__, __LINE__);
             return STATUS_ERROR;
@@ -322,14 +327,16 @@ int deserialize_request_options(int fd, employee **employees, db_header *dbhdr, 
             return STATUS_ERROR;
         }
     }
-    else if ((char)(*request_cursor) == 'u')
+
+    // check for update employee option
+    if ((size_t)(conn->buf_cursor - conn->buf) < conn->buf_size && *conn->buf_cursor == 'u')
     {
         // attempt to deserialize update option from request
-        request_cursor++;
+        conn->buf_cursor++;
         uint32_t hours;
         char *employee_name;
 
-        if (deserialize_update_employee_option(&request_cursor, &employee_name, &hours) == STATUS_ERROR)
+        if (deserialize_update_employee_option(&conn->buf_cursor, &employee_name, &hours) == STATUS_ERROR)
         {
             fprintf(stderr, "%s:%s:%d deserialize_update_employee_option() failed\n", __FILE__, __FUNCTION__, __LINE__);
             return STATUS_ERROR;
@@ -349,6 +356,14 @@ int deserialize_request_options(int fd, employee **employees, db_header *dbhdr, 
 
         if (!found)
         {
+            // write error code 1 to response buffer
+            *((*response_buf) + sizeof(proto_msg)) = 1;
+            return STATUS_SUCCESS;
+        }
+    }
+
+
+
             
 
 

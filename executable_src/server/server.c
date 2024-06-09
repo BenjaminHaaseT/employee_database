@@ -253,6 +253,7 @@ int main(int argc, char *argv[])
                         free_client_connection(conn);
                         remove_fd(pfds, &fd_count conn_idx);
                         connection_map_remove(&client_connections, pfds[i].fd);
+                        continue;
                     }
                     else if (conn->state == UNINITIALIZED && nbytes_read == sizeof(proto_msg) + sizeof(uint16_t))
                     {
@@ -318,10 +319,29 @@ int main(int argc, char *argv[])
                         }
                     }
 
-                    // Check if connection has been transistioned/or is in, request state and all bytes of request have been processed
+                    // Check if connection has been transistioned/or is in, request state and all bytes of request have been read successfully
                     if (conn->state == REQUEST && nbytes_read == conn->buf_size)
                     {
                         // once this state is reached process request and reset state of connection
+                        // allocate buffer for response to client
+                        size_t response_buf_size = sizeof(proto_msg) + 1;
+                        unsigned char *response_buf = malloc(response_buf_size);
+                        *(proto_msg *)(response_buf) = DB_ACCESS_RESPONSE;
+
+                        if (deserialize_request_options(fd, &employees, &dbhdr, &response_buf, &response_buf_size, conn) == STATUS_ERROR)
+                        {
+                            fprintf(stderr, "deserialize_request_options() failed\n");
+                            exit(1);
+                        }
+
+                        // process request and write to response buffer depending on options requested
+
+                        // send response back to client
+
+                        // reset client, reset header and buf cursor's and state to initialized
+
+                    }
+                }
 
 
                         
@@ -457,6 +477,7 @@ int receive_from_client(int client_fd, client_connection *conn)
 {
     if (conn->state == UNINITIALIZED)
     {
+        // compute number of byte remaining when in uninitialized state
         size_t bytes_rem = sizeof(proto_msg) + sizeof(uint16_t) - (size_t)(conn->header_cursor - conn->header);
         int nbytes_read = 0;
         if ((nbytes_read = recv(client_fd, conn->header_cursor, bytes_rem, 0)) == -1)
@@ -473,6 +494,7 @@ int receive_from_client(int client_fd, client_connection *conn)
     }
     else if (conn->state == INITIALIZED)
     {
+        // compute bytes left to be read
         size_t header_bytes_rem = sizeof(proto_msg) + sizeof(uint32_t) - (size_t)(conn->header_cursor - conn->header);
         int nbytes_read = 0;
         if ((nbytes_read = recv(client_fd, conn->header_cursor, header_bytes_rem, 0)) == -1)
@@ -502,40 +524,11 @@ int receive_from_client(int client_fd, client_connection *conn)
         // client has ended connection early
         if (nbytes_read == 0) return 0;
 
+        // update buffer cursor
+        conn->buf_cursor += nbytes_read;
+
         return (int)(conn->buf_cursor - conn->buf);
     }
-        
-        
-
-        //if (conn->header_cursor - conn->header == sizeof(proto_msg) + sizeof(uint32_t))
-        //{
-        //    // ensure tag contains correct type
-        //    proto_msg msg_type = *(proto_msg*)(conn->header);
-        //    if (msg_type != DB_ACCESS_REQUEST)
-        //    {
-        //        fprintf(stderr, "%s:%s:%d illegal message type\n", __FILE__, __FUNCTION__, __LINE__);
-        //        return STATUS_ERROR;
-        //    }
-
-        //    // transistion state for conn, client is now ready to read data from socket
-        //    conn->state = REQUEST;
-
-        //    // parse length of data and allocate buffer for data
-        //    uint32_t data_len = ntohl(*(uint32_t*)(conn->header + sizeof(proto_msg)));
-        //    conn->buf = malloc(data_len);
-        //    conn->cursor = conn->buf;
-
-
-
-            
-
-
-
-
-
-
-
-
 }
 
             

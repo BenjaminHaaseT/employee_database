@@ -24,7 +24,7 @@ int serialize_list_option(unsigned char **buf, unsigned char **cursor, size_t *c
 int deserialize_add_employee_option(unsigned char **cursor, employee *e);
 int deserialize_update_employee_option(unsigned char **cursor, char **employee_name, uint32_t *hours);
 int deserialize_delete_employee_option(unsigned char **cursor, char **employee_name);
-int deserialize_request_options(int fd, employee **employees, db_header *dbhdr, unsigned char **response_buf, unsigned char *request_cursor);
+int deserialize_request_options(int fd, employee **employees, db_header *dbhdr, unsigned char **response_buf, client_connection *conn);
 
 
 
