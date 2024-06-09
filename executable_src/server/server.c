@@ -324,7 +324,7 @@ int main(int argc, char *argv[])
                     {
                         // once this state is reached process request and reset state of connection
                         // allocate buffer for response to client
-                        size_t response_buf_size = sizeof(proto_msg) + 1;
+                        size_t response_buf_size = sizeof(proto_msg) + sizeof(uint32_t) + 1;
                         unsigned char *response_buf = malloc(response_buf_size);
                         *(proto_msg *)(response_buf) = DB_ACCESS_RESPONSE;
 

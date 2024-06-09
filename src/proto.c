@@ -50,7 +50,7 @@ int receive_all(int socket, void *buf, size_t buf_size, int flags)
     return total_bytes_recv;
 }
 
-int resize_request_buffer(unsigned char **buf, unsigned char **cursor, size_t *capacity, size_t data_len)
+int resize_buffer(unsigned char **buf, unsigned char **cursor, size_t *capacity, size_t data_len)
 {
     size_t delta;
     if ((delta = *capacity - ((*cursor) - (*buf))) < data_len)
@@ -101,7 +101,7 @@ int serialize_add_employee_option(unsigned char **buf, unsigned char **cursor, s
     size_t data_len = name_len + address_len + 2 * sizeof(uint16_t) + sizeof(uint32_t) + 1;
 
     // ensure we have enough space in the buffer to serialize all the data 
-    if (resize_request_buffer(buf, cursor, capacity, data_len) == STATUS_ERROR)
+    if (resize_buffer(buf, cursor, capacity, data_len) == STATUS_ERROR)
     {
         return STATUS_ERROR;
     }
@@ -188,7 +188,7 @@ int serialize_update_employee_option(unsigned char **buf, unsigned char **cursor
     size_t data_len = sizeof(uint16_t) + sizeof(uint32_t) + name_len + 1;
 
     // check if there is enough space in the buffer
-    if (resize_request_buffer(buf, cursor, capacity, data_len) == STATUS_ERROR)
+    if (resize_buffer(buf, cursor, capacity, data_len) == STATUS_ERROR)
     {
         return STATUS_ERROR;
     }
@@ -243,7 +243,7 @@ int serialize_delete_employee_option(unsigned char **buf, unsigned char **cursor
 
     size_t data_len = sizeof(uint16_t) + name_len + 1;
     // ensure buffer has capacity
-    if (resize_request_buffer(buf, cursor, capacity, data_len) == STATUS_ERROR)
+    if (resize_buffer(buf, cursor, capacity, data_len) == STATUS_ERROR)
     {
         return STATUS_ERROR;
     }
@@ -281,7 +281,7 @@ int deserialize_delete_employee_option(unsigned char **cursor, char **employee_n
 int serialize_list_option(unsigned char **buf, unsigned char **cursor, size_t *capacity)
 {
     // check that we have enough space to add a single character
-    if (resize_request_buffer(buf, cursor, capacity, 1) == STATUS_ERROR)
+    if (resize_buffer(buf, cursor, capacity, 1) == STATUS_ERROR)
     {
         return STATUS_ERROR;
     }
@@ -289,6 +289,47 @@ int serialize_list_option(unsigned char **buf, unsigned char **cursor, size_t *c
     *(*cursor)++ = 'l';
     return STATUS_SUCCESS;
 }
+
+    
+int serialize_list_employee_response(unsigned char **buf, unsigned char *cursor, uint64_t *buf_len, employee *employees, size_t employees_size)
+{
+    // serialize each employee one by one into the response buffer
+    for (size_t i = 0; i < employees_size; i++)
+    {
+        uint16_t name_len = strlen(e->name) + 1;
+        uint16_t address_len = strlen(e->address) + 1;
+
+        // allocate buffer with enough space for length of name and address, name and address and hours worked
+        size_t employee_len = name_len + address_len + 2 * sizeof(uint16_t) + sizeof(uint32_t);
+
+        // resize response buffer if necessary
+        if (resize_buffer(buf, &cursor, buf_len, employee_len) == STATUS_ERROR)
+        {
+            fprintf(stderr, "%s:%s:%d resize_buffer() failed\n", __FILE__, __FUNCTION__, __LINE__);
+            return STATUS_ERROR;
+        }
+        
+        // write name length and name string to buffer
+        *((uint16_t *)cursor) = htons(name_len);
+        cursor += sizeof(uint16_t);
+        strncpy((char*)cursor, e->name, name_len);
+        cursor += name_len;
+        *cursor++ = '\0';
+
+        // write address length and address string to buffer
+        *((uint16_t*)cursor) = (uint16_t) htons(address_len);
+        cursor += sizeof(uint16_t);
+        strncpy((char*)cursor, e->address, address_len);
+        cursor += address_len;
+        *cursor++ = '\0';
+
+        // write hours to buffer
+        uint32_t *hours_ptr = (uint32_t*)cursor;
+        *hours_ptr = (uint32_t) htonl(e->hours);
+    }
+    return STATUS_SUCCESS;
+}
+
 
 int deserialize_request_options(int fd, employee **employees, db_header *dbhdr, unsigned char **response_buf, client_connection *conn)
 {
@@ -354,13 +395,112 @@ int deserialize_request_options(int fd, employee **employees, db_header *dbhdr, 
             }
         }
 
+        free(employee_name);
+
         if (!found)
         {
             // write error code 1 to response buffer
             *((*response_buf) + sizeof(proto_msg)) = 1;
             return STATUS_SUCCESS;
         }
+
+        // write to file
+        if (write_db(fd, dbhdr, *employees) == STATUS_ERROR)
+        {
+            fprintf(stderr, "%s:%s:%d write_db() failed\n", __FILE__, __FUNCTION__, __LINE__);
+            return STATUS_ERROR;
+        }
     }
+
+    // check for delete employee option
+    if ((size_t)(conn->buf_cursor - conn->buf) < conn->buf_size && *conn->buf_cursor == 'd')
+    {
+        // deserialize a delete employee option from request
+        // adjust buffer's cursor
+        conn->buf_cursor++;
+
+        char *employee_name;
+        if (deserialize_delete_employee_option(&conn->buf_cursor, &employee_name) == STATUS_ERROR)
+        {
+            fprintf(stderr, "%s:%s:%d deserialize_delete_employee_option() failed\n", __FILE__, __FUNCTION__, __LINE__);
+            return STATUS_ERROR;
+        }
+
+        // search for employee
+        bool found = false;
+        for (size_t i = 0; i < dbhdr->employee_count; i++)
+        {
+            if (!strcmp((*employees)[i].name, employee_name))
+            {
+                found = true;
+                (*employees)[i] = (*employees)[--dbhdr->employee_count];
+                break;
+            }
+        }
+
+        free(employee_name);
+
+        if (!found)
+        {
+            // write error code 1 to response buffer
+            *((*response_buf) + sizeof(proto_msg)) = 1;
+            return STATUS_SUCCESS;
+        }
+
+        // write to file
+        if (write_db(fd, dbhdr, *employees) == STATUS_ERROR)
+        {
+            fprintf(stderr, "%s:%s:%d write_db() failed\n", __FILE__, __FUNCTION__, __LINE__);
+            return STATUS_ERROR;
+        }
+    }
+
+    // check for list option
+    if ((size_t)(conn->buf_cursor - conn->buf) < conn->buf_size && *conn->buf_cursor == 'l')
+    {
+        // we need to serialize all employees into the response buffer
+        size_t response_size = sizeof(proto_msg) + sizeof(uint32_t) + 1;
+        unsigned char *response_cursor = *response_buf + response_size;
+        if (serialize_list_employee_response(response_buf, response_cursor, &response_size, employees) == STATUS_ERROR)
+        {
+            fprintf(stderr, "%s:%s:%d serialize_list_employee_response() failed\n", __FILE__, __FUNCTION__, __LINE__);
+            return STATUS_ERROR;
+        }
+
+        // write success flag to response buffer
+        *((*response_buf) + sizeof(proto_msg)) = 0;
+
+        // compute length of data
+        uint32_t data_len = response_size - sizeof(proto_msg) - sizeof(uint32_t) - 1;
+
+        // write data length to response buffer
+        *(uint32_t *)((*response_buf) + sizeof(proto_msg) + 1) = htonl(data_len);
+        return STATUS_SUCCESS;
+    }
+
+    // write succes flag to response buffer
+    *(*response_buf + sizeof(proto_msg)) = 0;
+    *(uint32_t*)((*response_buf) + sizeof(proto_msg) + 1) = 0;
+    return STATUS_SUCCESS;
+}
+
+
+
+
+
+        
+
+        
+        
+
+
+
+
+
+
+
+
+
 
 
 

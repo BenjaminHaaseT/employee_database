@@ -66,6 +66,7 @@ int serialize_employee(employee *e, unsigned char **buf, size_t *buf_len)
     return STATUS_SUCCESS;
 }
 
+
 int deserialize_employee(employee *e, unsigned char *buf, size_t *buf_len)
 {
     // for traversing the buffer
