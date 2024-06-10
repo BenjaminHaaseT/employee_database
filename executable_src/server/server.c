@@ -26,7 +26,8 @@
 
 void print_usage(char **argv);
 int get_listener_socket(char *address, char *port);
-int add_fd(struct pollfd *pfds, size_t *fd_count, nfds_t *fd_size);
+int add_fd(struct pollfd **pfds, size_t *fd_count, nfds_t *fd_size, int fd);
+void remove_fd(struct pollfd *pfds, size_t *fd_count, size_t conn_idx);
 int receive_from_client(int client_fd, client_connection *conn);
 int send_handshake_response(int client_fd, unsigned char flag);
 
@@ -137,7 +138,7 @@ int main(int argc, char *argv[])
     long parsed_protocol_version = strtol(protocol_version_str, &end, 10);
     if (!end || *end != '\0' || errno == ERANGE || parsed_protocol_version < 0 || parsed_protocol_version > UINT16_MAX)
     {
-        fprintf(stderr, "invalid protocol version %l\n", parsed_protocol_version);
+        fprintf(stderr, "invalid protocol version %ld\n", parsed_protocol_version);
         exit(1);
     }
 
@@ -245,7 +246,8 @@ int main(int argc, char *argv[])
                         fprintf(stderr, "receive_from_client() failed\n");
                         exit(1);
                     }
-                    else if (nbytes_read == 0)
+
+                    if (nbytes_read == 0)
                     {
                         // client's connection has terminated
                         printf("client disconnected\n");
@@ -265,8 +267,10 @@ int main(int argc, char *argv[])
                             // TODO: send error response
                            if (send_handshake_response(pfds[i].fd, 0) == STATUS_ERROR)
                            {
-                               fprintf("send_handshake_response() failed\n");
+                               fprintf(stderr, "send_handshake_response() failed\n");
                            }
+                           //reset header cursor for client connection
+                           conn->header_cursor = conn->header;
                         }
                         else
                         {
@@ -285,7 +289,27 @@ int main(int argc, char *argv[])
 
                            if (send_handshake_response(pfds[i].fd, flag) == STATUS_ERROR)
                            {
-                               fprintf("send_handshake_response() failed\n");
+                               fprintf(stderr, "send_handshake_response() failed\n");
+                               exit(1);
+                           }
+
+                           if (!flag)
+                           {
+                               // transistion state of client connection
+                               conn->state = INITIALIZED;
+                               unsigned char *new_header = realloc(conn->header, sizeof(proto_msg) + sizeof(uint32_t));
+                               if (!new_header)
+                               {
+                                   fprintf(stderr, "unable to reallocate header buffer for client connection\n");
+                                   exit(1);
+                               }
+
+                               conn->header = new_header;
+                               conn->header_cursor = conn->header;
+                           }
+                           else
+                           {
+                               conn->header_cursor = conn->header;
                            }
                         }
                     }
@@ -329,7 +353,7 @@ int main(int argc, char *argv[])
                         *(proto_msg *)(response_buf) = DB_ACCESS_RESPONSE;
 
                         // process request and write to response buffer depending on options requested
-                        if (deserialize_request_options(fd, &employees, &dbhdr, &response_buf, &response_buf_size, conn) == STATUS_ERROR)
+                        if (deserialize_request_options(fd, &employees, &dbhdr, &response_buf, conn) == STATUS_ERROR)
                         {
                             fprintf(stderr, "deserialize_request_options() failed\n");
                             exit(1);
@@ -350,36 +374,11 @@ int main(int argc, char *argv[])
                         conn->buf_header = NULL;
                     }
                 }
-
+            }   // check for pollin flag being set
+        } // for loop checking sockets to poll
+    } // end while loop
 
                         
-
-
-
-
-
-
-
-
-
-
-                      
-
-
-
-
-
-                
-
-                    
-
-    
-
-
-}
-
-    
-
 
 
 
@@ -534,7 +533,6 @@ int receive_from_client(int client_fd, client_connection *conn)
 
         // update buffer cursor
         conn->buf_cursor += nbytes_read;
-
         return (int)(conn->buf_cursor - conn->buf);
     }
 }

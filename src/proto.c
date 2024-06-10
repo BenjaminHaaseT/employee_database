@@ -296,8 +296,8 @@ int serialize_list_employee_response(unsigned char **buf, unsigned char *cursor,
     // serialize each employee one by one into the response buffer
     for (size_t i = 0; i < employees_size; i++)
     {
-        uint16_t name_len = strlen(e->name) + 1;
-        uint16_t address_len = strlen(e->address) + 1;
+        uint16_t name_len = strlen(employees[i].name) + 1;
+        uint16_t address_len = strlen(employees[i].address) + 1;
 
         // allocate buffer with enough space for length of name and address, name and address and hours worked
         size_t employee_len = name_len + address_len + 2 * sizeof(uint16_t) + sizeof(uint32_t);
@@ -312,20 +312,20 @@ int serialize_list_employee_response(unsigned char **buf, unsigned char *cursor,
         // write name length and name string to buffer
         *((uint16_t *)cursor) = htons(name_len);
         cursor += sizeof(uint16_t);
-        strncpy((char*)cursor, e->name, name_len);
+        strncpy((char*)cursor, employees[i].name, name_len);
         cursor += name_len;
         *cursor++ = '\0';
 
         // write address length and address string to buffer
         *((uint16_t*)cursor) = (uint16_t) htons(address_len);
         cursor += sizeof(uint16_t);
-        strncpy((char*)cursor, e->address, address_len);
+        strncpy((char*)cursor, employees[i].address, address_len);
         cursor += address_len;
         *cursor++ = '\0';
 
         // write hours to buffer
         uint32_t *hours_ptr = (uint32_t*)cursor;
-        *hours_ptr = (uint32_t) htonl(e->hours);
+        *hours_ptr = (uint32_t) htonl(employees[i].hours);
     }
     return STATUS_SUCCESS;
 }
@@ -461,7 +461,7 @@ int deserialize_request_options(int fd, employee **employees, db_header *dbhdr, 
         // we need to serialize all employees into the response buffer
         size_t response_size = sizeof(proto_msg) + sizeof(uint32_t) + 1;
         unsigned char *response_cursor = *response_buf + response_size;
-        if (serialize_list_employee_response(response_buf, response_cursor, &response_size, employees) == STATUS_ERROR)
+        if (serialize_list_employee_response(response_buf, response_cursor, &response_size, *employees, dbhdr->employee_count) == STATUS_ERROR)
         {
             fprintf(stderr, "%s:%s:%d serialize_list_employee_response() failed\n", __FILE__, __FUNCTION__, __LINE__);
             return STATUS_ERROR;
@@ -484,49 +484,7 @@ int deserialize_request_options(int fd, employee **employees, db_header *dbhdr, 
     return STATUS_SUCCESS;
 }
 
-
-
-
-
-        
-
-        
-        
-
-
-
-
-
-
-
-
-
-
-
-
             
-
-
-
-
-
-
-
-
-
-
-
-
-
-}
-
-
-
-        
-
-
-    
-
     
 
  

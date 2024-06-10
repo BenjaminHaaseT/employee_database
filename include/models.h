@@ -3,6 +3,14 @@
 
 #include <stdint.h>
 
+
+typedef enum {
+    HANDSHAKE_REQUEST,  /* Request from a client to connect to the server, includes protocol version */
+    HANDSHAKE_RESPONSE,  /* Response to client connecting to server, validates protocol version being used by client*/
+    DB_ACCESS_REQUEST,  /* Request from client to access the database */
+    DB_ACCESS_RESPONSE, /* Response from server to a client's db access request */
+} proto_msg;
+
 typedef enum {
     UNINITIALIZED,  /* Connected but handshake has not been confirmed */
     INITIALIZED,    /* Protocol version has been validated, waiting to read request */
@@ -32,11 +40,11 @@ uint64_t hash_key(int key);
 struct map_node {
     int key;
     client_connection *conn;
-    struct map_node *next
-} 
+    struct map_node *next;
+}; 
 
 typedef struct {
-    struct mape_node **table;
+    struct map_node **table;
     size_t capacity;
     size_t entry_count;
     double alpha;

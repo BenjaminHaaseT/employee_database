@@ -2,10 +2,11 @@
 #include <stdio.h>
 
 #include "models.h"
+#include "common.h"
 
 void client_connection_set_handshake_header(client_connection *conn)
 {
-    conn->header = malloc(HANDSHAKE_REQ_SIZE);
+    conn->header = malloc(sizeof(proto_msg) + sizeof(uint16_t));
 }
 
 void client_connection_init(client_connection *conn, size_t conn_idx)
@@ -15,11 +16,12 @@ void client_connection_init(client_connection *conn, size_t conn_idx)
     conn->state = UNINITIALIZED;
     conn->conn_idx = conn_idx;
     conn->buf = NULL;
+    conn->buf_cursor = NULL;
 }
 
-void free_client_connection(client_connetcion *conn)
+void free_client_connection(client_connection *conn)
 {
-    free(con->header);
+    free(conn->header);
     if (conn->buf)
         free(conn->buf);
     free(conn);
@@ -50,13 +52,13 @@ void connection_map_init(connection_map *m, double alpha)
 void connection_map_resize(connection_map *m)
 {
     size_t new_capacity = 2 * m->capacity;
-    struct map_node **new_table = malloc(new_capacity * sizeof(map_node*));
+    struct map_node **new_table = malloc(new_capacity * sizeof(struct map_node*));
     for (size_t i = 0; i < new_capacity; i++)
         new_table[i] = NULL;
 
     for (size_t i = 0; i < m->capacity; i++)
     {
-        map_node *cur = m->table[i];
+        struct map_node *cur = m->table[i];
         while (cur)
         {
             struct map_node *temp = cur->next;
@@ -94,7 +96,7 @@ void connection_map_insert(connection_map *m, int key, client_connection *conn)
     }
     
     // instantiate a new node to put into hash map
-    struct map_node *neo = malloc(sizeof(map_node));
+    struct map_node *neo = malloc(sizeof(struct map_node));
     neo->key = key;
     neo->conn = conn;
     neo->next = m->table[idx];
