@@ -291,7 +291,7 @@ int serialize_list_option(unsigned char **buf, unsigned char **cursor, size_t *c
 }
 
     
-int serialize_list_employee_response(unsigned char **buf, unsigned char *cursor, uint64_t *buf_len, employee *employees, size_t employees_size)
+int serialize_list_employee_response(unsigned char **buf, unsigned char *cursor, uint32_t *buf_len, employee *employees, size_t employees_size)
 {
     // serialize each employee one by one into the response buffer
     for (size_t i = 0; i < employees_size; i++)
@@ -329,6 +329,29 @@ int serialize_list_employee_response(unsigned char **buf, unsigned char *cursor,
     }
     return STATUS_SUCCESS;
 }
+
+int deserialize_list_employee_response(unsigned char *buf, size_t buf_size, employee **employees, size_t *employees_size)
+{
+    // for keeping track of the number of bytes we have read from buf
+    size_t total_bytes_read = 0;
+
+    // allocate for deserializing employees
+    *employees = malloc(32 * sizeof(employee));
+    *employees_size = 32;
+    size_t employees_len = 0;
+
+    while (total_bytes_read < buf_size)
+    {
+        unsigned char *cursor = buf;
+
+        // parse name length of employee
+        uint16_t name_len = ntohs(*(uint16_t*)cursor);
+        cursor += sizeof(uint16_t);
+        
+        uint16_t address_len;
+
+
+
 
 
 int deserialize_request_options(int fd, employee **employees, db_header *dbhdr, unsigned char **response_buf, client_connection *conn)
