@@ -30,6 +30,7 @@ int add_fd(struct pollfd **pfds, size_t *fd_count, nfds_t *fd_size, int fd);
 void remove_fd(struct pollfd *pfds, size_t *fd_count, size_t conn_idx);
 int receive_from_client(int client_fd, client_connection *conn);
 int send_handshake_response(int client_fd, unsigned char flag);
+int send_invalid_request_response(int client_fd);
 
 
 int main(int argc, char *argv[])
@@ -264,11 +265,13 @@ int main(int argc, char *argv[])
                         if (msg_type != HANDSHAKE_REQUEST)
                         {
                             fprintf(stderr, "illegal message type received from client\n");
-                            // TODO: send error response
-                           if (send_handshake_response(pfds[i].fd, 0) == STATUS_ERROR)
+                            // send error response
+                           if (send_invalid_request_response(pfds[i].fd)  == STATUS_ERROR)
                            {
-                               fprintf(stderr, "send_handshake_response() failed\n");
+                               fprintf(stderr, "send_invalid_request_response() failed\n");
+                               exit(1);
                            }
+
                            //reset header cursor for client connection
                            conn->header_cursor = conn->header;
                         }
@@ -320,9 +323,12 @@ int main(int argc, char *argv[])
                         if (msg_type != DB_ACCESS_REQUEST)
                         {
                             fprintf(stderr, "illegal message type received from client\n");
-                            // TODO: send error response to client
+                            if (send_invalid_request_response(pfds[i].fd)  == STATUS_ERROR)
+                            {
+                                fprintf(stderr, "send_invalid_request_response() failed\n");
+                                exit(1);
+                            }
                         }
-
 
                         // parse data length and allocate buffer response data
                         uint32_t data_len = ntohl(*(uint32_t *)(conn->header + sizeof(proto_msg)));
@@ -371,16 +377,12 @@ int main(int argc, char *argv[])
                         conn->header_cursor = conn->header;
                         free(conn->buf);
                         conn->buf = NULL;
-                        conn->buf_header = NULL;
+                        conn->buf_cursor = NULL;
                     }
                 }
             }   // check for pollin flag being set
         } // for loop checking sockets to poll
     } // end while loop
-
-                        
-
-
 
     return 0;
 }
@@ -441,7 +443,7 @@ int get_listener_socket(char *address, char *port)
     freeaddrinfo(ai);
     if (!p)
     {
-        fprintf(stderr, "%s:%s:%d unable to bind socket\n", __FILE__, __FUNCTION__, __LINE__, errno, strerror(errno));
+        fprintf(stderr, "%s:%s:%d unable to bind socket: (%d) %s\n", __FILE__, __FUNCTION__, __LINE__, errno, strerror(errno));
         return STATUS_ERROR;
     }
 
@@ -463,7 +465,7 @@ int add_fd(struct pollfd **pfds, size_t *fd_count, nfds_t *fd_size, int fd)
         struct pollfd *new_pfds = realloc(*pfds, *fd_size * sizeof(struct pollfd));
         if (!new_pfds)
         {
-            fprintf("%s:%s:%d unable to reallocate file descriptor set\n", __FILE__, __FUNCTION__, __LINE__);
+            fprintf(stderr, "%s:%s:%d unable to reallocate file descriptor set\n", __FILE__, __FUNCTION__, __LINE__);
             return STATUS_ERROR;
         }
         *pfds = new_pfds;
@@ -524,7 +526,7 @@ int receive_from_client(int client_fd, client_connection *conn)
 
         if ((nbytes_read = recv(client_fd, conn->buf_cursor, buf_bytes_rem, 0)) == -1)
         {
-            fprintf(stderr, "%s:%s:%d unable to receive data bytes from client's socket: (%d) %s\n", __FILE__, __FUNCTION__, __LINE__);
+            fprintf(stderr, "%s:%s:%d unable to receive bytes from client's socket: (%d) %s\n", __FILE__, __FUNCTION__, __LINE__, errno, strerror(errno));
             return STATUS_ERROR;
         }
 
@@ -546,7 +548,7 @@ int send_handshake_response(int client_fd, unsigned char flag)
     *(response_buffer + sizeof(proto_msg)) = flag;
 
     // send response to client
-    if (send_all(client_fd, response_buffer, sizeof(proto_msg) + 1, 0) == STATUS_ERRRO)
+    if (send_all(client_fd, response_buffer, sizeof(proto_msg) + 1, 0) == STATUS_ERROR)
     {
         fprintf(stderr, "%s:%s:%d unable to send handshake response to client\n", __FILE__, __FUNCTION__, __LINE__);
         return STATUS_ERROR;
@@ -558,18 +560,20 @@ int send_handshake_response(int client_fd, unsigned char flag)
 }
 
     
-
-
-
-
-
-        
-        
-
-
-
-
-
-
-
+int send_invalid_request_response(int client_fd)
+{
+    // allocate buffer and serialize response data
+    unsigned char *response_buffer = malloc(sizeof(proto_msg));
+    *(proto_msg *)response_buffer = INVALID_REQUEST;
     
+    // send response down the wire
+    if (send_all(client_fd, response_buffer, sizeof(proto_msg), 0) == STATUS_ERROR)
+    {
+        fprintf(stderr, "%s:%s:%d unable to send error response to client\n", __FILE__, __FUNCTION__, __LINE__);
+        return STATUS_ERROR;
+    }
+
+    free(response_buffer);
+    return STATUS_SUCCESS;
+}
+

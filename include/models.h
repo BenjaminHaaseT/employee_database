@@ -9,6 +9,7 @@ typedef enum {
     HANDSHAKE_RESPONSE,  /* Response to client connecting to server, validates protocol version being used by client*/
     DB_ACCESS_REQUEST,  /* Request from client to access the database */
     DB_ACCESS_RESPONSE, /* Response from server to a client's db access request */
+    INVALID_REQUEST,    /* Informs client that request is invalid */
 } proto_msg;
 
 typedef enum {
