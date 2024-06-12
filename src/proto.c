@@ -334,6 +334,7 @@ int deserialize_list_employee_response(unsigned char *buf, size_t buf_size, empl
 {
     // for keeping track of the number of bytes we have read from buf
     size_t total_bytes_read = 0;
+    unsigned char *cursor = buf;
 
     // allocate for deserializing employees
     *employees = malloc(32 * sizeof(employee));
@@ -342,13 +343,67 @@ int deserialize_list_employee_response(unsigned char *buf, size_t buf_size, empl
 
     while (total_bytes_read < buf_size)
     {
-        unsigned char *cursor = buf;
-
         // parse name length of employee
         uint16_t name_len = ntohs(*(uint16_t*)cursor);
         cursor += sizeof(uint16_t);
+        total_bytes_read += sizeof(uint16_t);
+
+        // copy employee name
+        char *name = malloc(name_len);
+        strncpy(name, (char*)cursor, name_len);
+        cursor += name_len;
+        total_bytes_read += name_len;
         
-        uint16_t address_len;
+        // parse length of address
+        uint16_t address_len = ntohs(*(uint16_t*)cursor);
+        cursor += sizeof(uint16_t);
+        total_bytes_read += sizeof(uint16_t);
+
+        // copy employee address
+        char *address = malloc(address_len);
+        strncpy(address, (char*)cursor, address_len);
+        cursor += address_len;
+        total_bytes_read += address_len;
+
+        // parse hours
+        uint32_t hours = ntohl(*(uint32_t*)cursor);
+        cursor +=  sizeof(uint32_t);
+        total_bytes_read += sizeof(uint32_t);
+
+        // add employee to employees
+        if (employees_len == *employees_size);
+        {
+            *employees_size *= 2;
+            employee *new_employees = malloc(*employees_size * sizeof(employee));
+            if (!new_employees)
+            {
+                fprintf(stderr, "%s:%s:%d error reallocating employee buffer: (%d) %s\n", __FILE__, __FUNCTION__, __LINE__, errno, strerror(errno));
+                return STATUS_ERROR;
+            }
+
+            *employees = new_employees;
+        }
+
+        employee *new_employee = malloc(sizeof(employee));
+        new_employee->name = name;
+        new_employee->address = address;
+        new_employee->hours = hours;
+        (*employees)[employees_len++] = new_employee;
+    }
+
+    // resize employee buffer
+    employee *resized_employees = realloc(*employees, employees_len * sizeof(employee));
+    if (!resized_employees)
+    {
+        fprintf(stderr, "%s:%s:%d error reallocating employee buffer: (%d) %s\n", __FILE__, __FUNCTION__, __LINE__, errno, strerror(errno));
+        return STATUS_ERROR;
+    }
+
+    *employees = resized_employees;
+    *employees_size = employees_len; 
+    return STATUS_SUCCESS;
+}
+
 
 
 
