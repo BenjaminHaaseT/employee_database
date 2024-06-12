@@ -6,6 +6,7 @@
 
 #include "common.h"
 #include "proto.h"
+#include "models.h"
 //#include "parse.h"
 
 
@@ -217,6 +218,48 @@ int test_serialize_deserialize_options(void)
     return STATUS_SUCCESS;
 }
 
+int test_serialize_list_employee_response(void)
+{
+    // employees to be serialized
+    employee *employees = malloc(3 * sizeof(employee));
+    employees[0].name = "John Doe";
+    employees[0].address = "123 Wallaby Way, Sydney";
+    employees[0].hours = 120;
+
+    employees[1].name = "Sally Sample";
+    employees[1].address = "123 easy st, Sydney";
+    employees[1].hours = 180;
+
+    employees[2].name = "Suzy Mediocare";
+    employees[2].address = "666 Sunny Ln, New York";
+    employees[2].hours = 220;
+
+    // for serializing employees
+    size_t header_len = sizeof(proto_msg) + sizeof(uint32_t) + 1;
+    size_t buf_len = header_len;
+    unsigned char *buf = malloc(buf_len);
+    *((proto_msg*)buf) = DB_ACCESS_RESPONSE;
+    *(buf + sizeof(proto_msg)) = 0;
+    
+    // cursor for the buffer
+    unsigned char *cursor = buf + header_len;
+
+    // test serializing the employees
+    if (serialize_list_employee_response(&buf, cursor, (uint32_t*)&buf_len, employees, 3) == STATUS_ERROR)
+    {
+        fprintf(stderr, "%s:%s:%d serialize_list_employees() failed\n", __FILE__, __FUNCTION__, __LINE__);
+        return STATUS_ERROR;
+    }
+
+    size_t data_len = buf_len - header_len;
+    printf("data_len: %zu\n", data_len);
+    return STATUS_SUCCESS;
+}
+
+
+
+
+
 
 
 int main(void)
@@ -231,6 +274,14 @@ int main(void)
 
     printf("test_serialize_deserialize_options()...\n");
     if (test_serialize_deserialize_options() == STATUS_ERROR)
+    {
+        printf("failed\n");
+        return STATUS_ERROR;
+    }
+    printf("passed\n\n");
+
+    printf("test_serialize_list_employee_response()...\n");
+    if (test_serialize_list_employee_response() == STATUS_ERROR)
     {
         printf("failed\n");
         return STATUS_ERROR;

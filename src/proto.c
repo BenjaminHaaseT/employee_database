@@ -303,7 +303,7 @@ int serialize_list_employee_response(unsigned char **buf, unsigned char *cursor,
         size_t employee_len = name_len + address_len + 2 * sizeof(uint16_t) + sizeof(uint32_t);
 
         // resize response buffer if necessary
-        if (resize_buffer(buf, &cursor, buf_len, employee_len) == STATUS_ERROR)
+        if (resize_buffer(buf, &cursor, (size_t*)buf_len, employee_len) == STATUS_ERROR)
         {
             fprintf(stderr, "%s:%s:%d resize_buffer() failed\n", __FILE__, __FUNCTION__, __LINE__);
             return STATUS_ERROR;
@@ -371,7 +371,7 @@ int deserialize_list_employee_response(unsigned char *buf, size_t buf_size, empl
         total_bytes_read += sizeof(uint32_t);
 
         // add employee to employees
-        if (employees_len == *employees_size);
+        if (employees_len == *employees_size)
         {
             *employees_size *= 2;
             employee *new_employees = malloc(*employees_size * sizeof(employee));
@@ -384,11 +384,10 @@ int deserialize_list_employee_response(unsigned char *buf, size_t buf_size, empl
             *employees = new_employees;
         }
 
-        employee *new_employee = malloc(sizeof(employee));
-        new_employee->name = name;
-        new_employee->address = address;
-        new_employee->hours = hours;
-        (*employees)[employees_len++] = new_employee;
+        ((*employees) + employees_len)->name = name;
+        ((*employees) + employees_len)->address = address;
+        ((*employees) + employees_len)->hours = hours;
+        employees_len++;
     }
 
     // resize employee buffer
@@ -537,7 +536,7 @@ int deserialize_request_options(int fd, employee **employees, db_header *dbhdr, 
     if ((size_t)(conn->buf_cursor - conn->buf) < conn->buf_size && *conn->buf_cursor == 'l')
     {
         // we need to serialize all employees into the response buffer
-        size_t response_size = sizeof(proto_msg) + sizeof(uint32_t) + 1;
+        uint32_t response_size = sizeof(proto_msg) + sizeof(uint32_t) + 1;
         unsigned char *response_cursor = *response_buf + response_size;
         if (serialize_list_employee_response(response_buf, response_cursor, &response_size, *employees, dbhdr->employee_count) == STATUS_ERROR)
         {
