@@ -19,6 +19,7 @@ int serialize_update_employee_option(unsigned char **buf, unsigned char **cursor
 int serialize_delete_employee_option(unsigned char **buf, unsigned char **cursor, size_t *capacity, char *delete_employee_name);
 int serialize_list_option(unsigned char **buf, unsigned char **cursor, size_t *capacity);
 int serialize_list_employee_response(unsigned char **buf, unsigned char *cursor, uint32_t *buf_len, employee *employees, size_t employees_size);
+int deserialize_list_employee_response(unsigned char *buf, size_t buf_size, employee **employees, size_t *employees_size);
 int deserialize_add_employee_option(unsigned char **cursor, employee *e);
 int deserialize_update_employee_option(unsigned char **cursor, char **employee_name, uint32_t *hours);
 int deserialize_delete_employee_option(unsigned char **cursor, char **employee_name);

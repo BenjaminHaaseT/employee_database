@@ -296,6 +296,7 @@ int serialize_list_employee_response(unsigned char **buf, unsigned char *cursor,
     // serialize each employee one by one into the response buffer
     for (size_t i = 0; i < employees_size; i++)
     {
+        // add one to automatically copy null terminating character whenever 'strncpy' is used
         uint16_t name_len = strlen(employees[i].name) + 1;
         uint16_t address_len = strlen(employees[i].address) + 1;
 
@@ -314,18 +315,17 @@ int serialize_list_employee_response(unsigned char **buf, unsigned char *cursor,
         cursor += sizeof(uint16_t);
         strncpy((char*)cursor, employees[i].name, name_len);
         cursor += name_len;
-        *cursor++ = '\0';
 
         // write address length and address string to buffer
         *((uint16_t*)cursor) = (uint16_t) htons(address_len);
         cursor += sizeof(uint16_t);
         strncpy((char*)cursor, employees[i].address, address_len);
         cursor += address_len;
-        *cursor++ = '\0';
 
         // write hours to buffer
         uint32_t *hours_ptr = (uint32_t*)cursor;
         *hours_ptr = (uint32_t) htonl(employees[i].hours);
+        cursor += sizeof(uint32_t);
     }
     return STATUS_SUCCESS;
 }

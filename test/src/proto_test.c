@@ -253,12 +253,168 @@ int test_serialize_list_employee_response(void)
 
     size_t data_len = buf_len - header_len;
     printf("data_len: %zu\n", data_len);
+
+    // write data length to buffer
+    cursor = buf + sizeof(proto_msg) + 1;
+    *((uint32_t*)cursor) = htonl((uint32_t)data_len);
+
     return STATUS_SUCCESS;
 }
 
 
+int test_serialize_deserialize_list_employee_response(void)
+{
+    // employees to be serialized
+    employee *employees = malloc(3 * sizeof(employee));
+    employees[0].name = "John Doe";
+    employees[0].address = "123 Wallaby Way, Sydney";
+    employees[0].hours = 120;
+
+    employees[1].name = "Sally Sample";
+    employees[1].address = "123 easy st, Sydney";
+    employees[1].hours = 180;
+
+    employees[2].name = "Suzy Mediocare";
+    employees[2].address = "666 Sunny Ln, New York";
+    employees[2].hours = 220;
+
+    // for serializing employees
+    size_t header_len = sizeof(proto_msg) + sizeof(uint32_t) + 1;
+    size_t buf_len = header_len;
+    unsigned char *buf = malloc(buf_len);
+    *((proto_msg*)buf) = DB_ACCESS_RESPONSE;
+    *(buf + sizeof(proto_msg)) = 0;
+    
+    // cursor for the buffer
+    unsigned char *cursor = buf + header_len;
+
+    // test serializing the employees
+    if (serialize_list_employee_response(&buf, cursor, (uint32_t*)&buf_len, employees, 3) == STATUS_ERROR)
+    {
+        fprintf(stderr, "%s:%s:%d serialize_list_employees() failed\n", __FILE__, __FUNCTION__, __LINE__);
+        return STATUS_ERROR;
+    }
+
+    size_t data_len = buf_len - header_len;
+    printf("data_len: %zu\n", data_len);
+    
+    // write data length to buffer
+    cursor = buf + sizeof(proto_msg) + 1;
+    *((uint32_t*)cursor) = htonl((uint32_t)data_len);
 
 
+    // simulate deserializing data written into the buffer
+    cursor = buf;
+    proto_msg msg_type = *((proto_msg *)cursor);
+    if (msg_type != DB_ACCESS_RESPONSE)
+    {
+        fprintf(stderr, "%s:%s:%d invalid proto_msg type\n", __FILE__, __FUNCTION__, __LINE__);
+        return STATUS_ERROR;
+    }
+
+    cursor += sizeof(proto_msg);
+    unsigned char error_flag = *cursor;
+    if (error_flag)
+    {
+        fprintf(stderr, "%s:%s:%d error flag set\n", __FILE__, __FUNCTION__, __LINE__);
+        return STATUS_ERROR;
+    }
+
+    cursor++;
+
+    uint32_t deserialized_data_len = ntohl(*((uint32_t *)cursor));
+    if (deserialized_data_len != data_len)
+    {
+        fprintf(stderr, "%s:%s:%d deserialized_data_len invalid: '%u' should be '%zu'\n", __FILE__, __FUNCTION__, __LINE__, deserialized_data_len, data_len);
+        return STATUS_ERROR;
+    }
+    cursor += sizeof(uint32_t);
+
+    // for deserializing employees
+    employee *deserialized_employees;
+    size_t deserialized_employee_len;
+
+    //attempt to deserialize the data
+    if (deserialize_list_employee_response(cursor, deserialized_data_len, &deserialized_employees, &deserialized_employee_len) == STATUS_ERROR)
+    {
+        fprintf(stderr, "%s:%s:%d deserialize_list_employee_response() failed\n", __FILE__, __FUNCTION__, __LINE__);
+        return STATUS_ERROR;
+    }
+
+    // check deserialized length
+    if (deserialized_employee_len != 3)
+    {
+        fprintf(stderr, "%s:%s:%d deserialized_employee_len invalid: '%zu' should be '%d'\n", __FILE__, __FUNCTION__, __LINE__, deserialized_employee_len, 3);
+        return STATUS_ERROR;
+    }
+
+    // check employee values
+    // check names are equal
+    if (strcmp(deserialized_employees[0].name, employees[0].name))
+    {
+        fprintf(stderr, "%s:%s:%d deserializing employee %d name failed: '%s' should be '%s'\n", __FILE__, __FUNCTION__, __LINE__, 0, deserialized_employees[0].name, employees[0].name);
+        return STATUS_ERROR;
+    }
+
+    // check address
+    if (strcmp(deserialized_employees[0].address, employees[0].address))
+    {
+        fprintf(stderr, "%s:%s:%d deserializing employee %d address failed: '%s' should be '%s'\n", __FILE__, __FUNCTION__, __LINE__, 0, deserialized_employees[0].address, employees[0].address);
+        return STATUS_ERROR;
+    }
+
+    // check hours
+    if (deserialized_employees[0].hours != employees[0].hours)
+    {
+        fprintf(stderr, "%s:%s:%d deserializing employee %d hours failed: '%u' should be '%u'\n", __FILE__, __FUNCTION__, __LINE__, 0, deserialized_employees[0].hours, employees[0].hours);
+        return STATUS_ERROR;
+    }
+        
+
+    // check names are equal
+    if (strcmp(deserialized_employees[1].name, employees[1].name))
+    {
+        fprintf(stderr, "%s:%s:%d deserializing employee %d name failed: '%s' should be '%s'\n", __FILE__, __FUNCTION__, __LINE__, 1, deserialized_employees[1].name, employees[1].name);
+        return STATUS_ERROR;
+    }
+
+    // check address
+    if (strcmp(deserialized_employees[1].address, employees[1].address))
+    {
+        fprintf(stderr, "%s:%s:%d deserializing employee %d address failed: '%s' should be '%s'\n", __FILE__, __FUNCTION__, __LINE__, 1, deserialized_employees[1].address, employees[1].address);
+        return STATUS_ERROR;
+    }
+
+    // check hours
+    if (deserialized_employees[1].hours != employees[1].hours)
+    {
+        fprintf(stderr, "%s:%s:%d deserializing employee %d hours failed: '%u' should be '%u'\n", __FILE__, __FUNCTION__, __LINE__, 1, deserialized_employees[1].hours, employees[1].hours);
+        return STATUS_ERROR;
+    }
+
+    // check names are equal
+    if (strcmp(deserialized_employees[2].name, employees[2].name))
+    {
+        fprintf(stderr, "%s:%s:%d deserializing employee %d name failed: '%s' should be '%s'\n", __FILE__, __FUNCTION__, __LINE__, 2, deserialized_employees[2].name, employees[2].name);
+        return STATUS_ERROR;
+    }
+
+    // check address
+    if (strcmp(deserialized_employees[2].address, employees[2].address))
+    {
+        fprintf(stderr, "%s:%s:%d deserializing employee %d address failed: '%s' should be '%s'\n", __FILE__, __FUNCTION__, __LINE__, 2, deserialized_employees[2].address, employees[2].address);
+        return STATUS_ERROR;
+    }
+
+    // check hours
+    if (deserialized_employees[2].hours != employees[2].hours)
+    {
+        fprintf(stderr, "%s:%s:%d deserializing employee %d hours failed: '%u' should be '%u'\n", __FILE__, __FUNCTION__, __LINE__, 2, deserialized_employees[2].hours, employees[2].hours);
+        return STATUS_ERROR;
+    }
+
+    return STATUS_SUCCESS;
+}
 
 
 
@@ -282,6 +438,14 @@ int main(void)
 
     printf("test_serialize_list_employee_response()...\n");
     if (test_serialize_list_employee_response() == STATUS_ERROR)
+    {
+        printf("failed\n");
+        return STATUS_ERROR;
+    }
+    printf("passed\n\n");
+
+    printf("test_serialize_deserialize_list_employee_response()...\n");
+    if (test_serialize_deserialize_list_employee_response() == STATUS_ERROR)
     {
         printf("failed\n");
         return STATUS_ERROR;
