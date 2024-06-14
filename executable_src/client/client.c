@@ -255,6 +255,7 @@ int main(int argc, char *argv[])
 
     // parse length of response
     uint32_t data_len = ntohl(*((uint32_t *)(response_header + sizeof(proto_msg) + 1)));
+    free(response_header);
     if (data_len > 0)
     {
         // allocate for receiving serialized employees
@@ -276,11 +277,15 @@ int main(int argc, char *argv[])
             exit(1);
         }
 
+        free(serialized_employees);
+
         // display employees
         for (size_t i = 0; i < employees_size; i++)
         {
             fprintf("%s\t%s\t%u", employees[i].name, employees[i].address, employees[i].hours);
         }
+
+        free(employees);
     }
 
     return 0;
