@@ -17,6 +17,7 @@
 
 void print_usage(char **argv);
 int send_handshake(int socket, uint16_t protocol_version);
+void decode_request_error(unsigned char error_flag);
 
 
 int main(int argc, char *argv[])
@@ -117,7 +118,7 @@ int main(int argc, char *argv[])
     // validate socket
     if (sockfd == -1 || !ptr)
     {
-        fprintf(stderr, "unable to instantiate socket: %s\n", strerror(errno));
+        fprintf(stderr, "unable to create socket: %s\n", strerror(errno));
         exit(1);
     }
 
@@ -138,12 +139,19 @@ int main(int argc, char *argv[])
     }
 
     // wait for handshake response from server, confirm protocol versions match
-    proto_msg *handshake_response = malloc(HANDSHAKE_RESP_SIZE);
+    unsigned char *handshake_response = malloc(HANDSHAKE_RESP_SIZE);
     if (receive_all(sockfd, handshake_response, HANDSHAKE_RESP_SIZE, 0) == STATUS_ERROR)
     {
         fprintf(stderr, "unable to receive handshake response\n");
         exit(1);
     }
+
+    if (*(proto_msg *)handshake_response != HANDSHAKE_RESPONSE)
+    {
+        fprintf(stderr, "internal server error\n");
+        exit(1);
+    }
+
     if (*(unsigned char *)(handshake_response + 1))
     {
         fprintf(stderr, "invalid protocol version\n");
@@ -215,7 +223,65 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
+    // free request buffer
+    free(buf);
+
 	// de-serialize and parse response
+    size_t response_header_size = sizeof(proto_msg) + sizeof(uint32_t) + 1;
+    unsigned char *response_header = malloc(response_header_size);
+
+    if (receive_all(sockfd, response_header, response_header_size, 0) == STATUS_ERROR)
+    {
+        fprintf(stderr, "unable to receive response from server\n");
+        exit(1);
+    }
+
+    // check response type in header
+    proto_msg response_type = *(proto_msg *)response_header;
+    if (response_type == INVALID_REQUEST)
+    {
+        fprintf(stderr, "invalid request\n");
+        exit(1);
+    }
+
+    // check for errors in response
+    unsigned char error_flag = *(response_header + sizeof(proto_msg));
+    if (error_flag)
+    {
+        fprintf(stderr, "request error\n");
+        decode_request_error(error_flag);
+        exit(1);
+    }
+
+    // parse length of response
+    uint32_t data_len = ntohl(*((uint32_t *)(response_header + sizeof(proto_msg) + 1)));
+    if (data_len > 0)
+    {
+        // allocate for receiving serialized employees
+        unsigned char *serialized_employees = malloc(data_len);
+
+        // read bytes sent from server
+        if (receive_all(sockfd, serialized_employees, data_len, 0) == STATUS_ERROR)
+        {
+            fprintf(stderr, "unable to receive serialized data from server\n");
+            exit(1);
+        }
+
+        // for deserializing received employee bytes
+        employee *employees;
+        size_t employees_size;
+        if (deserialize_list_employee_response(serialized_employees, data_len, &employees, &employees_size) == STATUS_ERROR)
+        {
+            fprintf(stderr, "unable to deserialize employees from raw bytes\n");
+            exit(1);
+        }
+
+        // display employees
+        for (size_t i = 0; i < employees_size; i++)
+        {
+            fprintf("%s\t%s\t%u", employees[i].name, employees[i].address, employees[i].hours);
+        }
+    }
 
     return 0;
 }

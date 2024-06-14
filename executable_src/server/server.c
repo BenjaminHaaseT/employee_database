@@ -550,7 +550,7 @@ int send_handshake_response(int client_fd, unsigned char flag)
 int send_invalid_request_response(int client_fd)
 {
     // allocate buffer and serialize response data
-    unsigned char *response_buffer = malloc(sizeof(proto_msg));
+    unsigned char *response_buffer = malloc(sizeof(proto_msg) + sizeof(uint32_t) + 1);
     *(proto_msg *)response_buffer = INVALID_REQUEST;
     
     // send response down the wire
