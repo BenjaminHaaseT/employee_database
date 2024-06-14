@@ -11,6 +11,7 @@ void client_connection_set_handshake_header(client_connection *conn)
 
 void client_connection_init(client_connection *conn, size_t conn_idx)
 {
+    // allocate enough space for any request type in header
     conn->header = malloc(sizeof(proto_msg) + sizeof(uint32_t));
     conn->header_cursor = conn->header;
     conn->state = UNINITIALIZED;

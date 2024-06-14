@@ -404,10 +404,6 @@ int deserialize_list_employee_response(unsigned char *buf, size_t buf_size, empl
 }
 
 
-
-
-
-
 int deserialize_request_options(int fd, employee **employees, db_header *dbhdr, unsigned char **response_buf, client_connection *conn)
 {
     // set cursor to beginning of request buffer
@@ -536,7 +532,8 @@ int deserialize_request_options(int fd, employee **employees, db_header *dbhdr, 
     if ((size_t)(conn->buf_cursor - conn->buf) < conn->buf_size && *conn->buf_cursor == 'l')
     {
         // we need to serialize all employees into the response buffer
-        uint32_t response_size = sizeof(proto_msg) + sizeof(uint32_t) + 1;
+        uint32_t response_header_size = sizeof(proto_msg) + sizeof(uint32_t) + 1;
+        uint32_t response_size = response_header_size;
         unsigned char *response_cursor = *response_buf + response_size;
         if (serialize_list_employee_response(response_buf, response_cursor, &response_size, *employees, dbhdr->employee_count) == STATUS_ERROR)
         {
@@ -548,7 +545,7 @@ int deserialize_request_options(int fd, employee **employees, db_header *dbhdr, 
         *((*response_buf) + sizeof(proto_msg)) = 0;
 
         // compute length of data
-        uint32_t data_len = response_size - sizeof(proto_msg) - sizeof(uint32_t) - 1;
+        uint32_t data_len = response_size - response_header_size;
 
         // write data length to response buffer
         *(uint32_t *)((*response_buf) + sizeof(proto_msg) + 1) = htonl(data_len);

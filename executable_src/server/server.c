@@ -285,8 +285,11 @@ int main(int argc, char *argv[])
                             }
                             else
                             {
+                                // set flag to 0 to signal no errors 
                                 flag = 0;
+                                // transistion state of client to initialized
                                 conn->state = INITIALIZED;
+                                // reset cursor for request header
                                 conn->header_cursor = conn->header;
                             }
 
@@ -294,25 +297,6 @@ int main(int argc, char *argv[])
                            {
                                fprintf(stderr, "send_handshake_response() failed\n");
                                exit(1);
-                           }
-
-                           if (!flag)
-                           {
-                               // transistion state of client connection
-                               conn->state = INITIALIZED;
-                               unsigned char *new_header = realloc(conn->header, sizeof(proto_msg) + sizeof(uint32_t));
-                               if (!new_header)
-                               {
-                                   fprintf(stderr, "unable to reallocate header buffer for client connection\n");
-                                   exit(1);
-                               }
-
-                               conn->header = new_header;
-                               conn->header_cursor = conn->header;
-                           }
-                           else
-                           {
-                               conn->header_cursor = conn->header;
                            }
                         }
                     }
@@ -328,6 +312,9 @@ int main(int argc, char *argv[])
                                 fprintf(stderr, "send_invalid_request_response() failed\n");
                                 exit(1);
                             }
+                            // reset header cursor for client connection
+                            conn->header_cursor = conn->header;
+                            continue;
                         }
 
                         // parse data length and allocate buffer response data
