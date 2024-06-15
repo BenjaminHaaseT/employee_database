@@ -210,11 +210,11 @@ int main(int argc, char *argv[])
 
     // Compute total length of request data
     size_t total_len = (size_t)(cursor - buf);
-    size_t data_len = total_len - header_size;
+    uint32_t data_len = total_len - header_size;
   
     // write length of data to header
     cursor = buf + sizeof(proto_msg);
-    *((uint32_t*)(cursor)) = htonl((uint32_t)data_len);
+    *((uint32_t*)(cursor)) = htonl(data_len);
 
 	// send request
     if (send_all(sockfd, buf, total_len, 0) == STATUS_ERROR)
@@ -254,7 +254,7 @@ int main(int argc, char *argv[])
     }
 
     // parse length of response
-    uint32_t data_len = ntohl(*((uint32_t *)(response_header + sizeof(proto_msg) + 1)));
+    data_len = ntohl(*((uint32_t *)(response_header + sizeof(proto_msg) + 1)));
     free(response_header);
     if (data_len > 0)
     {
@@ -282,7 +282,7 @@ int main(int argc, char *argv[])
         // display employees
         for (size_t i = 0; i < employees_size; i++)
         {
-            fprintf("%s\t%s\t%u", employees[i].name, employees[i].address, employees[i].hours);
+            fprintf(stderr, "%s\t%s\t%u", employees[i].name, employees[i].address, employees[i].hours);
         }
 
         free(employees);
@@ -324,3 +324,16 @@ int send_handshake(int socket, uint16_t protocol_version)
 
     return STATUS_SUCCESS;
 }
+
+
+void decode_request_error(unsigned char error_flag)
+{
+    switch (error_flag)
+    {
+        case 1:
+            printf("employee not present in database\n");
+        default:
+            printf("unknown error occurred\n");
+    }
+}
+            
