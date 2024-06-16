@@ -432,7 +432,6 @@ int get_listener_socket(char *address, char *port)
     }
 
     // validate we have a listener
-    freeaddrinfo(ai);
     if (!p)
     {
         fprintf(stderr, "%s:%s:%d unable to bind socket: (%d) %s\n", __FILE__, __FUNCTION__, __LINE__, errno, strerror(errno));
@@ -445,6 +444,18 @@ int get_listener_socket(char *address, char *port)
         return STATUS_ERROR;
     }
 
+    char host[INET6_ADDRSTRLEN];
+    char service[MAX_SERV_LEN];
+
+    if ((status = getnameinfo(p->ai_addr, p->ai_addrlen, host, INET6_ADDRSTRLEN, service, MAX_SERV_LEN, NI_NUMERICHOST | NI_NUMERICSERV) == -1))
+    {
+        fprintf(stderr, "%s:%s:%d getnameinfo failed: (%d) %s\n", __FILE__, __FUNCTION__, __LINE__, status, gai_strerror(status));
+        return STATUS_ERROR;
+    }
+
+    printf("listening at %s:%s...\n", host, service);
+    // free addrinfo 
+    freeaddrinfo(ai);
     return listener;
 }
         
