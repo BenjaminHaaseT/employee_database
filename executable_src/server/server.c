@@ -27,7 +27,7 @@
 void print_usage(char **argv);
 int get_listener_socket(char *address, char *port);
 int add_fd(struct pollfd **pfds, size_t *fd_count, nfds_t *fd_size, int fd);
-void remove_fd(struct pollfd *pfds, size_t *fd_count, size_t conn_idx);
+void remove_fd(struct pollfd *pfds, size_t *fd_count, connection_map *m, size_t conn_idx);
 int receive_from_client(int client_fd, client_connection *conn);
 int send_handshake_response(int client_fd, unsigned char flag);
 int send_invalid_request_response(int client_fd);
@@ -317,7 +317,7 @@ int main(int argc, char *argv[])
                             continue;
                         }
 
-                        // parse data length and allocate buffer response data
+                        // parse data length and allocate buffer for request data
                         uint32_t data_len = ntohl(*(uint32_t *)(conn->header + sizeof(proto_msg)));
                         conn->buf = malloc(data_len);
                         conn->buf_cursor = conn->buf;
@@ -326,7 +326,7 @@ int main(int argc, char *argv[])
                         // transition state of connection
                         conn->state = REQUEST;
 
-                        // attempt to read any remaining bytes from client's socket just in more were able to get sent
+                        // attempt to read any remaining bytes from client's socket just in case more were able to get through
                         // reset 'nbytes_read' to zero to keep track of bytes read from the request
                         nbytes_read = 0;
                         if ((nbytes_read = receive_from_client(pfds[i].fd, conn)) == STATUS_ERROR)
@@ -463,9 +463,25 @@ int add_fd(struct pollfd **pfds, size_t *fd_count, nfds_t *fd_size, int fd)
     return STATUS_SUCCESS;
 }
 
-void remove_fd(struct pollfd *pfds, size_t *fd_count, size_t conn_idx)
+void remove_fd(struct pollfd *pfds, size_t *fd_count, connection_map *m, size_t conn_idx)
 {
-    pfds[conn_idx] = pfds[--(*fd_count)];
+    size_t replacement_idx = --(*fd_count);
+    if (replacement_idx != conn_idx)
+    {
+        // we need to update the conn_idx for the connection that is the replacement
+        pfds[conn_idx] = pfds[replacement_idx];
+        client_connection *replacement_conn = connection_map_get(m, pfds[replacement_idx].fd);
+        if (!replacement_conn)
+        {
+            fprintf(stderr, "%s:%s:%d replacement connection not present in map\n", __FILE__, __FUNCTION__, __LINE__);
+            return STATUS_ERROR;
+        }
+
+        replacement_conn->conn_idx = conn_idx;
+        return STATUS_SUCCESS
+    }
+
+    return STATUS_SUCCESS;
 }
 
 
