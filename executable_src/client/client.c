@@ -297,9 +297,9 @@ int main(int argc, char *argv[])
 void print_usage(char **argv)
 {
     printf("usage: %s -h <HOST> -p <PORT> -v <VERSION> [OPTIONS]\n", argv[0]);
-    printf("\t-v <VERSION> : protocol version\n");
-    printf("\t-h <HOST> : address of host\n");
-    printf("\t-p <PORT> : port of host\n");
+    printf("\t-v <VERSION> : (REQUIRED) protocol version\n");
+    printf("\t-h <HOST> : (REQUIRED) address of host\n");
+    printf("\t-p <PORT> : (REQUIRED) port of host\n");
     printf("\t-a <EMPLOYEE> : add an employee to the database, <EMPLOYEE> should be a comma seperated list of values\n");
     printf("\t-u <EMPLOYEE NAME> : name of an employee whose hours are to be updated, -n argument is also required to specify number of hours\n");
     printf("\t-n <HOURS> : the number of hours to update a given employee\n");

@@ -26,7 +26,7 @@ build_cli: $(EXECSRC)/cli/cli.c $(OBJFILES)
 	$(CC) -g -o$(BIN)/cli $^ -I$(INCDIR) -Wall -Werror $(OPT)
 
 build_client: $(EXECSRC)/client/client.c $(OBJFILES)
-	$(CC) -g -o$(BIN)/cli $^ -I$(INCDIR) -Wall -Werror $(OPT)
+	$(CC) -g -o$(BIN)/client $^ -I$(INCDIR) -Wall -Werror $(OPT)
 
 build_server: $(EXECSRC)/server/server.c $(OBJFILES)
 	$(CC) -g -o$(BIN)/server $^ -I$(INCDIR) -Wall -Werror $(OPT)
