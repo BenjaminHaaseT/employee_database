@@ -27,7 +27,7 @@
 void print_usage(char **argv);
 int get_listener_socket(char *address, char *port);
 int add_fd(struct pollfd **pfds, size_t *fd_count, nfds_t *fd_size, int fd);
-void remove_fd(struct pollfd *pfds, size_t *fd_count, connection_map *m, size_t conn_idx);
+int remove_fd(struct pollfd *pfds, size_t *fd_count, connection_map *m, size_t conn_idx);
 int receive_from_client(int client_fd, client_connection *conn);
 int send_handshake_response(int client_fd, unsigned char flag);
 int send_invalid_request_response(int client_fd);
@@ -66,7 +66,7 @@ int main(int argc, char *argv[])
                 fname = optarg;
                 break;
             case 'n':
-                new_file_flag = optarg;
+                new_file_flag = true;
                 break;
             case ':':
                 fprintf(stderr, "missing argument value\n");
@@ -254,7 +254,11 @@ int main(int argc, char *argv[])
                         printf("client disconnected\n");
                         size_t conn_idx = conn->conn_idx;
                         free_client_connection(conn);
-                        remove_fd(pfds, &fd_count, conn_idx);
+                        if (remove_fd(pfds, &fd_count, &client_connections, conn_idx) == STATUS_ERROR)
+                        {
+                            fprintf(stderr, "remove_fd() failed\n");
+                            exit(1);
+                        }
                         connection_map_remove(&client_connections, pfds[i].fd);
                         continue;
                     }
@@ -424,6 +428,7 @@ int get_listener_socket(char *address, char *port)
             close(listener);
             continue;
         }
+        break;
     }
 
     // validate we have a listener
@@ -463,7 +468,7 @@ int add_fd(struct pollfd **pfds, size_t *fd_count, nfds_t *fd_size, int fd)
     return STATUS_SUCCESS;
 }
 
-void remove_fd(struct pollfd *pfds, size_t *fd_count, connection_map *m, size_t conn_idx)
+int remove_fd(struct pollfd *pfds, size_t *fd_count, connection_map *m, size_t conn_idx)
 {
     size_t replacement_idx = --(*fd_count);
     if (replacement_idx != conn_idx)
@@ -478,7 +483,7 @@ void remove_fd(struct pollfd *pfds, size_t *fd_count, connection_map *m, size_t 
         }
 
         replacement_conn->conn_idx = conn_idx;
-        return STATUS_SUCCESS
+        return STATUS_SUCCESS;
     }
 
     return STATUS_SUCCESS;
