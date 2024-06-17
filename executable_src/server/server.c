@@ -31,6 +31,7 @@ int remove_fd(struct pollfd *pfds, size_t *fd_count, connection_map *m, size_t c
 int receive_from_client(int client_fd, client_connection *conn);
 int send_handshake_response(int client_fd, unsigned char flag);
 int send_invalid_request_response(int client_fd);
+int send_empty_response(int client_fd);
 
 
 int main(int argc, char *argv[])
@@ -259,6 +260,7 @@ int main(int argc, char *argv[])
                             fprintf(stderr, "remove_fd() failed\n");
                             exit(1);
                         }
+
                         connection_map_remove(&client_connections, pfds[i].fd);
                         continue;
                     }
@@ -268,7 +270,9 @@ int main(int argc, char *argv[])
                         proto_msg msg_type = *(proto_msg *)(conn->header);
                         if (msg_type != HANDSHAKE_REQUEST)
                         {
-                            fprintf(stderr, "illegal message type received from client\n");
+                            fprintf(stderr, "%s:%s:%d - illegal message type received from client\n", __FILE__, __FUNCTION__, __LINE__);
+                            fprintf(stderr, "expected %d received %d\n", HANDSHAKE_REQUEST, msg_type);
+
                             // send error response
                            if (send_invalid_request_response(pfds[i].fd)  == STATUS_ERROR)
                            {
@@ -310,7 +314,7 @@ int main(int argc, char *argv[])
                         proto_msg msg_type = *(proto_msg *)(conn->header);
                         if (msg_type != DB_ACCESS_REQUEST)
                         {
-                            fprintf(stderr, "illegal message type received from client\n");
+                            fprintf(stderr, "%s:%s:%d - illegal message type received from client\n", __FILE__, __FUNCTION__, __LINE__);
                             if (send_invalid_request_response(pfds[i].fd)  == STATUS_ERROR)
                             {
                                 fprintf(stderr, "send_invalid_request_response() failed\n");
@@ -323,6 +327,23 @@ int main(int argc, char *argv[])
 
                         // parse data length and allocate buffer for request data
                         uint32_t data_len = ntohl(*(uint32_t *)(conn->header + sizeof(proto_msg)));
+
+                        // check special case to see if client has sent empty request
+                        if (data_len == 0)
+                        {
+                            // client has sent empty request
+                            printf("client sent empty request\n");
+                            if (send_empty_response(pfds[i].fd) == STATUS_ERROR)
+                            {
+                                fprintf(stderr, "%s:%s:%d - unable to send empty response to client\n", __FILE__, __FUNCTION__, __LINE__);
+                                exit(1);
+                            }
+
+                            // reset header cursor of connection, in case client makes new request
+                            conn->header_cursor = conn->header;
+                            continue;
+                        }
+
                         conn->buf = malloc(data_len);
                         conn->buf_cursor = conn->buf;
                         conn->buf_size = (size_t) data_len;
@@ -348,6 +369,8 @@ int main(int argc, char *argv[])
                         size_t response_buf_size = sizeof(proto_msg) + sizeof(uint32_t) + 1;
                         unsigned char *response_buf = malloc(response_buf_size);
                         *(proto_msg *)(response_buf) = DB_ACCESS_RESPONSE;
+
+                        printf("deserializing request options\n");
 
                         // process request and write to response buffer depending on options requested
                         if (deserialize_request_options(fd, &employees, &dbhdr, &response_buf, conn) == STATUS_ERROR)
@@ -589,6 +612,24 @@ int send_invalid_request_response(int client_fd)
     if (send_all(client_fd, response_buffer, sizeof(proto_msg), 0) == STATUS_ERROR)
     {
         fprintf(stderr, "%s:%s:%d unable to send error response to client\n", __FILE__, __FUNCTION__, __LINE__);
+        return STATUS_ERROR;
+    }
+
+    free(response_buffer);
+    return STATUS_SUCCESS;
+}
+
+int send_empty_response(int client_fd)
+{
+    // allocate buffer and write values for an empty response
+    unsigned char *response_buffer = malloc(sizeof(proto_msg) + sizeof(uint32_t) + 1);
+    *((proto_msg *)response_buffer) = DB_ACCESS_RESPONSE;
+    *(response_buffer + sizeof(proto_msg)) = 0;
+    *((uint32_t *)(response_buffer + sizeof(proto_msg) + 1)) = 0;
+
+    if (send_all(client_fd, response_buffer, sizeof(proto_msg) + sizeof(uint32_t) + 1, 0) == STATUS_ERROR)
+    {
+        fprintf(stderr, "%s:%s:%d - unable to send empty response to client\n", __FILE__, __FUNCTION__, __LINE__);
         return STATUS_ERROR;
     }
 

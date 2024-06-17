@@ -139,8 +139,8 @@ int main(int argc, char *argv[])
     }
 
     // wait for handshake response from server, confirm protocol versions match
-    unsigned char *handshake_response = malloc(HANDSHAKE_RESP_SIZE);
-    if (receive_all(sockfd, handshake_response, HANDSHAKE_RESP_SIZE, 0) == STATUS_ERROR)
+    unsigned char *handshake_response = malloc(sizeof(proto_msg));
+    if (receive_all(sockfd, handshake_response, sizeof(proto_msg), 0) == STATUS_ERROR)
     {
         fprintf(stderr, "unable to receive handshake response\n");
         exit(1);
@@ -152,7 +152,15 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-    if (*(unsigned char *)(handshake_response + 1))
+    unsigned char handshake_flag;
+
+    if (receive_all(sockfd, &handshake_flag, 1, 0) == STATUS_ERROR)
+    {
+        fprintf(stderr, "unable to receive handshake response\n");
+        exit(1);
+    }
+
+    if (handshake_flag)
     {
         fprintf(stderr, "invalid protocol version\n");
         exit(1);
@@ -164,6 +172,8 @@ int main(int argc, char *argv[])
      size_t header_size = sizeof(proto_msg) + sizeof(uint32_t);
      size_t capacity = header_size;
      unsigned char *buf = malloc(capacity);
+     // write message type to buffer
+     *((proto_msg *)buf) = DB_ACCESS_REQUEST;
      unsigned char *cursor = buf + capacity;
 
 	// serialize request's, writing to buffer
@@ -282,10 +292,16 @@ int main(int argc, char *argv[])
         // display employees
         for (size_t i = 0; i < employees_size; i++)
         {
-            fprintf(stderr, "%s\t%s\t%u", employees[i].name, employees[i].address, employees[i].hours);
+            printf("%s\t%s\t%u", employees[i].name, employees[i].address, employees[i].hours);
         }
 
         free(employees);
+    }
+
+    if (close(sockfd) == -1)
+    {
+        fprintf(stderr, "close() failed: (%d) %s\n", errno, strerror(errno));
+        exit(1);
     }
 
     return 0;

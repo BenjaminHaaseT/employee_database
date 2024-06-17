@@ -151,13 +151,11 @@ void connection_map_remove(connection_map *m, int key)
     if (cur && prev)
     {
         prev = cur->next;
-        free_client_connection(cur->conn);
         free(cur);
     }
     else if (cur && !prev)
     {
         m->table[idx]->next = cur->next;
-        free_client_connection(cur->conn);
         free(cur);
     }
 }
