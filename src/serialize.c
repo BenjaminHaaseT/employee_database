@@ -268,6 +268,10 @@ int write_db(int fd, db_header *dbhdr, employee *employees)
 		return STATUS_ERROR;
 	}
 
+    // conver back to host byte order
+	dbhdr->fsize = ntohl(dbhdr->fsize);
+	dbhdr->employee_count = ntohl(dbhdr->employee_count);
+
 	return STATUS_SUCCESS;
 }
 
