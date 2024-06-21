@@ -422,7 +422,7 @@ int deserialize_request_options(int fd, employee **employees, db_header *dbhdr, 
 
         // add space for new employee
         (dbhdr->employee_count)++;
-        employee *new_employees = realloc(*employees, dbhdr->employee_count);
+        employee *new_employees = realloc(*employees, dbhdr->employee_count * sizeof(employee));
         if (!new_employees)
         {
             fprintf(stderr, "%s:%s:%d error reallocating employee buffer\n", __FILE__, __FUNCTION__, __LINE__);

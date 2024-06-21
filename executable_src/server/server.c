@@ -370,6 +370,8 @@ int main(int argc, char *argv[])
                         unsigned char *response_buf = malloc(response_buf_size);
                         *(proto_msg *)(response_buf) = DB_ACCESS_RESPONSE;
 
+                        printf("deserializing request options\n");
+
                         // process request and write to response buffer depending on options requested
                         if (deserialize_request_options(fd, &employees, &dbhdr, &response_buf, &response_buf_size, conn) == STATUS_ERROR)
                         {

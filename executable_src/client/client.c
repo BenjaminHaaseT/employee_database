@@ -292,7 +292,8 @@ int main(int argc, char *argv[])
         // display employees
         for (size_t i = 0; i < employees_size; i++)
         {
-            printf("%s\t%s\t%u", employees[i].name, employees[i].address, employees[i].hours);
+            printf("%s, %s, %u", employees[i].name, employees[i].address, employees[i].hours);
+            printf("\n");
         }
 
         free(employees);

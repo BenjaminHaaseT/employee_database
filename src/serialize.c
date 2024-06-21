@@ -176,6 +176,7 @@ int fdeserialize_employee(int fd, employee *e)
     char *name = malloc(name_len);
     if (read(fd, name, name_len) != name_len)
     {
+        printf("%s\n", name);
         fprintf(stderr, "%s:%s:%d - error reading name from database file: (%d) %s\n", __FILE__, __FUNCTION__, __LINE__, errno, strerror(errno));
         return STATUS_ERROR;
     }
