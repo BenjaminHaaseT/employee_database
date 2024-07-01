@@ -545,7 +545,6 @@ int deserialize_request_options(int fd, employee **employees, db_header *dbhdr, 
             return STATUS_ERROR;
         }
 
-        printf("serialized list option\n");
         // write success flag to response buffer
         *((*response_buf) + sizeof(proto_msg)) = 0;
 

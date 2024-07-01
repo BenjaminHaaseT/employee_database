@@ -309,8 +309,6 @@ int main(int argc, char *argv[])
 }
 
 
-
-
 void print_usage(char **argv)
 {
     printf("usage: %s -h <HOST> -p <PORT> -v <VERSION> [OPTIONS]\n", argv[0]);
@@ -349,6 +347,7 @@ void decode_request_error(unsigned char error_flag)
     {
         case 1:
             printf("employee not present in database\n");
+            break;
         default:
             printf("unknown error occurred\n");
     }
