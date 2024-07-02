@@ -32,7 +32,7 @@ int receive_from_client(int client_fd, client_connection *conn);
 int send_handshake_response(int client_fd, unsigned char flag);
 int send_invalid_request_response(int client_fd);
 int send_empty_response(int client_fd);
-
+int accept_new_client(int listener, struct pollfd **pfds, size_t *fd_count, nfds_t *fd_size, connection_map *m);
 
 int main(int argc, char *argv[])
 {
@@ -187,48 +187,53 @@ int main(int argc, char *argv[])
                 if (pfds[i].fd == listener)
                 {
                     // We are accepting a new client
-                    struct sockaddr_storage client_addr;
-                    socklen_t client_addrlen = sizeof(client_addr);
-                    int client_fd = accept(listener, (struct sockaddr *)&client_addr, &client_addrlen);
-
-                    // check if accepting failed
-                    if (client_fd == -1)
+                    if (accept_new_client(listener, &pfds, &fd_count, &fd_size, &client_connections) == STATUS_ERROR)
                     {
-                        fprintf(stderr, "accepting client failed: (%d) %s\n", errno, strerror(errno));
+                        fprintf(stderr, "accept_new_client() failed\n");
                         continue;
                     }
-                    else
-                    {
-                        char client_addr_buf[INET6_ADDRSTRLEN];
-                        char client_serv_buf[MAX_SERV_LEN];
-                        int status = getnameinfo(
-                                (struct sockaddr *)&client_addr, client_addrlen, 
-                                client_addr_buf, INET6_ADDRSTRLEN, 
-                                client_serv_buf, MAX_SERV_LEN, NI_NUMERICHOST | NI_NUMERICSERV);
+                    //struct sockaddr_storage client_addr;
+                    //socklen_t client_addrlen = sizeof(client_addr);
+                    //int client_fd = accept(listener, (struct sockaddr *)&client_addr, &client_addrlen);
 
-                        if (status)
-                        {
-                            fprintf(stderr, "unable to get name info for client: %s\n", gai_strerror(status));
-                        }
-                        else
-                        {
-                            printf("accepting new connection from %s:%s\n", client_addr_buf, client_serv_buf);
-                        }
+                    //// check if accepting failed
+                    //if (client_fd == -1)
+                    //{
+                    //    fprintf(stderr, "accepting client failed: (%d) %s\n", errno, strerror(errno));
+                    //    continue;
+                    //}
+                    //else
+                    //{
+                    //    char client_addr_buf[INET6_ADDRSTRLEN];
+                    //    char client_serv_buf[MAX_SERV_LEN];
+                    //    int status = getnameinfo(
+                    //            (struct sockaddr *)&client_addr, client_addrlen, 
+                    //            client_addr_buf, INET6_ADDRSTRLEN, 
+                    //            client_serv_buf, MAX_SERV_LEN, NI_NUMERICHOST | NI_NUMERICSERV);
 
-                        // add new client to pfds and map client socket to new client connection
+                    //    if (status)
+                    //    {
+                    //        fprintf(stderr, "unable to get name info for client: %s\n", gai_strerror(status));
+                    //    }
+                    //    else
+                    //    {
+                    //        printf("accepting new connection from %s:%s\n", client_addr_buf, client_serv_buf);
+                    //    }
 
-                        size_t conn_idx = fd_count;
-                        if (add_fd(&pfds, &fd_count, &fd_size, client_fd) == STATUS_ERROR)
-                        {
-                            fprintf(stderr, "unable to add client file descriptor\n");
-                            exit(1);
-                        }
+                    //    // add new client to pfds and map client socket to new client connection
 
-                        // create new client connection for mapping
-                        client_connection *client_conn = malloc(sizeof(client_connection));
-                        client_connection_init(client_conn, conn_idx);
-                        connection_map_insert(&client_connections, client_fd, client_conn);
-                    }
+                    //    size_t conn_idx = fd_count;
+                    //    if (add_fd(&pfds, &fd_count, &fd_size, client_fd) == STATUS_ERROR)
+                    //    {
+                    //        fprintf(stderr, "unable to add client file descriptor\n");
+                    //        exit(1);
+                    //    }
+
+                    //    // create new client connection for mapping
+                    //    client_connection *client_conn = malloc(sizeof(client_connection));
+                    //    client_connection_init(client_conn, conn_idx);
+                    //    connection_map_insert(&client_connections, client_fd, client_conn);
+                    //}
                 }
                 else
                 {
@@ -632,6 +637,54 @@ int send_empty_response(int client_fd)
     }
 
     free(response_buffer);
+    return STATUS_SUCCESS;
+}
+
+int accept_new_client(int listener, struct pollfd **pfds, size_t *fd_count, nfds_t *fd_size, connection_map *m)
+{
+    struct sockaddr_storage client_addr;
+    socklen_t client_addrlen = sizeof(client_addr);
+    int client_fd = accept(listener, (struct sockaddr *)&client_addr, &client_addrlen);
+
+    // check if accepting failed
+    if (client_fd == -1)
+    {
+        fprintf(stderr, "%s:%s:%d - accepting client failed: (%d) %s\n", __FILE__, __FUNCTION__, __LINE__, errno, strerror(errno));
+        return STATUS_ERROR;
+    }
+    else
+    {
+        char client_addr_buf[INET6_ADDRSTRLEN];
+        char client_serv_buf[MAX_SERV_LEN];
+        int status = getnameinfo(
+        (struct sockaddr *)&client_addr, client_addrlen, 
+        client_addr_buf, INET6_ADDRSTRLEN, 
+        client_serv_buf, MAX_SERV_LEN, NI_NUMERICHOST | NI_NUMERICSERV);
+
+        if (status)
+        {
+            fprintf(stderr, "%s:%s:%d - unable to get name info for client: %s\n", __FILE__, __FUNCTION__, __LINE__, gai_strerror(status));
+            return STATUS_ERROR;
+        }
+        else
+        {
+            printf("accepting new connection from %s:%s\n", client_addr_buf, client_serv_buf);
+        }
+
+        // add new client to pfds and map client socket to new client connection
+        size_t conn_idx = *fd_count;
+        if (add_fd(pfds, fd_count, fd_size, client_fd) == STATUS_ERROR)
+        {
+            fprintf(stderr, "%s:%s:%d - unable to add client file descriptor\n", __FILE__, __FUNCTION__, __LINE__);
+            return STATUS_ERROR;
+        }
+
+        // create new client connection for mapping
+        client_connection *client_conn = malloc(sizeof(client_connection));
+        client_connection_init(client_conn, conn_idx);
+        connection_map_insert(m, client_fd, client_conn);
+    }
+
     return STATUS_SUCCESS;
 }
 
