@@ -192,48 +192,6 @@ int main(int argc, char *argv[])
                         fprintf(stderr, "accept_new_client() failed\n");
                         continue;
                     }
-                    //struct sockaddr_storage client_addr;
-                    //socklen_t client_addrlen = sizeof(client_addr);
-                    //int client_fd = accept(listener, (struct sockaddr *)&client_addr, &client_addrlen);
-
-                    //// check if accepting failed
-                    //if (client_fd == -1)
-                    //{
-                    //    fprintf(stderr, "accepting client failed: (%d) %s\n", errno, strerror(errno));
-                    //    continue;
-                    //}
-                    //else
-                    //{
-                    //    char client_addr_buf[INET6_ADDRSTRLEN];
-                    //    char client_serv_buf[MAX_SERV_LEN];
-                    //    int status = getnameinfo(
-                    //            (struct sockaddr *)&client_addr, client_addrlen, 
-                    //            client_addr_buf, INET6_ADDRSTRLEN, 
-                    //            client_serv_buf, MAX_SERV_LEN, NI_NUMERICHOST | NI_NUMERICSERV);
-
-                    //    if (status)
-                    //    {
-                    //        fprintf(stderr, "unable to get name info for client: %s\n", gai_strerror(status));
-                    //    }
-                    //    else
-                    //    {
-                    //        printf("accepting new connection from %s:%s\n", client_addr_buf, client_serv_buf);
-                    //    }
-
-                    //    // add new client to pfds and map client socket to new client connection
-
-                    //    size_t conn_idx = fd_count;
-                    //    if (add_fd(&pfds, &fd_count, &fd_size, client_fd) == STATUS_ERROR)
-                    //    {
-                    //        fprintf(stderr, "unable to add client file descriptor\n");
-                    //        exit(1);
-                    //    }
-
-                    //    // create new client connection for mapping
-                    //    client_connection *client_conn = malloc(sizeof(client_connection));
-                    //    client_connection_init(client_conn, conn_idx);
-                    //    connection_map_insert(&client_connections, client_fd, client_conn);
-                    //}
                 }
                 else
                 {
