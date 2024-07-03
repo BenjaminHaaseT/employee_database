@@ -34,6 +34,7 @@ int send_invalid_request_response(int client_fd);
 int send_empty_response(int client_fd);
 int accept_new_client(int listener, struct pollfd **pfds, size_t *fd_count, nfds_t *fd_size, connection_map *m);
 int handle_client_disconnect(struct pollfd **pfds, size_t *fd_count, nfds_t *fd_size, connection_map *client_connections, client_connection *conn);
+int handle_uninitialized_client(int client_fd, client_connection *conn, uint16_t protocol_version);
 
 int main(int argc, char *argv[])
 {
@@ -225,46 +226,10 @@ int main(int argc, char *argv[])
                     }
                     else if (conn->state == UNINITIALIZED && nbytes_read == sizeof(proto_msg) + sizeof(uint16_t))
                     {
-                        // check message type
-                        proto_msg msg_type = *(proto_msg *)(conn->header);
-                        if (msg_type != HANDSHAKE_REQUEST)
+                        if (handle_uninitialized_client(pfds[i].fd, conn, parsed_protocol_version) == STATUS_ERROR)
                         {
-                            fprintf(stderr, "%s:%s:%d - illegal message type received from client\n", __FILE__, __FUNCTION__, __LINE__);
-                            fprintf(stderr, "expected %d received %d\n", HANDSHAKE_REQUEST, msg_type);
-
-                            // send error response
-                           if (send_invalid_request_response(pfds[i].fd)  == STATUS_ERROR)
-                           {
-                               fprintf(stderr, "send_invalid_request_response() failed\n");
-                               exit(1);
-                           }
-
-                           //reset header cursor for client connection
-                           conn->header_cursor = conn->header;
-                        }
-                        else
-                        {
-                            uint16_t client_protocol_version = ntohs(*(uint16_t *)(conn->header + sizeof(proto_msg)));
-                            int flag;
-                            if (client_protocol_version != parsed_protocol_version)
-                            {
-                                flag = 1;
-                            }
-                            else
-                            {
-                                // set flag to 0 to signal no errors 
-                                flag = 0;
-                                // transistion state of client to initialized
-                                conn->state = INITIALIZED;
-                                // reset cursor for request header
-                                conn->header_cursor = conn->header;
-                            }
-
-                           if (send_handshake_response(pfds[i].fd, flag) == STATUS_ERROR)
-                           {
-                               fprintf(stderr, "send_handshake_response() failed\n");
-                               exit(1);
-                           }
+                            fprintf(stderr, "handle_unitialized_client() failed\n");
+                            exit(1);
                         }
                     }
                     else if (conn->state == INITIALIZED && nbytes_read == sizeof(proto_msg) + sizeof(uint32_t))
@@ -656,6 +621,52 @@ int handle_client_disconnect(struct pollfd **pfds, size_t *fd_count, nfds_t *fd_
     }
 
     connection_map_remove(client_connections, client_fd);
+    return STATUS_SUCCESS;
+}
+
+int handle_uninitialized_client(int client_fd, client_connection *conn, uint16_t protocol_version)
+{
+    // check message type
+    proto_msg msg_type = *(proto_msg *)(conn->header);
+    if (msg_type != HANDSHAKE_REQUEST)
+    {
+        fprintf(stderr, "%s:%s:%d - illegal message type received from client\n", __FILE__, __FUNCTION__, __LINE__);
+        fprintf(stderr, "expected %d received %d\n", HANDSHAKE_REQUEST, msg_type);
+
+        // send error response
+       if (send_invalid_request_response(client_fd)  == STATUS_ERROR)
+       {
+           fprintf(stderr, "%s:%s:%d - send_invalid_request_response() failed\n", __FILE__, __FUNCTION__, __LINE__);
+           return STATUS_ERROR;
+       }
+
+       //reset header cursor for client connection
+       conn->header_cursor = conn->header;
+    }
+    else
+    {
+        uint16_t client_protocol_version = ntohs(*(uint16_t *)(conn->header + sizeof(proto_msg)));
+        int flag;
+        if (client_protocol_version != protocol_version)
+        {
+            flag = 1;
+        }
+        else
+        {
+            // set flag to 0 to signal no errors 
+            flag = 0;
+            // transistion state of client to initialized
+            conn->state = INITIALIZED;
+            // reset cursor for request header
+            conn->header_cursor = conn->header;
+        }
+
+       if (send_handshake_response(client_fd, flag) == STATUS_ERROR)
+       {
+           fprintf(stderr, "send_handshake_response() failed\n");
+           return STATUS_ERROR;
+       }
+    }
     return STATUS_SUCCESS;
 }
 
