@@ -221,16 +221,6 @@ int main(int argc, char *argv[])
                             fprintf(stderr, "handle_client_disconnect() failed\n");
                             exit(1);
                         }
-                        //printf("client disconnected\n");
-                        //size_t conn_idx = conn->conn_idx;
-                        //free_client_connection(conn);
-                        //if (remove_fd(pfds, &fd_count, &client_connections, conn_idx) == STATUS_ERROR)
-                        //{
-                        //    fprintf(stderr, "remove_fd() failed\n");
-                        //    exit(1);
-                        //}
-
-                        //connection_map_remove(&client_connections, pfds[i].fd);
                         continue;
                     }
                     else if (conn->state == UNINITIALIZED && nbytes_read == sizeof(proto_msg) + sizeof(uint16_t))
