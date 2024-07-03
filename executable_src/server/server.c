@@ -35,6 +35,7 @@ int send_empty_response(int client_fd);
 int accept_new_client(int listener, struct pollfd **pfds, size_t *fd_count, nfds_t *fd_size, connection_map *m);
 int handle_client_disconnect(struct pollfd **pfds, size_t *fd_count, nfds_t *fd_size, connection_map *client_connections, client_connection *conn);
 int handle_uninitialized_client(int client_fd, client_connection *conn, uint16_t protocol_version);
+int handle_initialized_client(int client_fd, client_connection *conn, int *nbytes_read);
 
 int main(int argc, char *argv[])
 {
@@ -234,53 +235,9 @@ int main(int argc, char *argv[])
                     }
                     else if (conn->state == INITIALIZED && nbytes_read == sizeof(proto_msg) + sizeof(uint32_t))
                     {
-                        // parse message type 
-                        proto_msg msg_type = *(proto_msg *)(conn->header);
-                        if (msg_type != DB_ACCESS_REQUEST)
+                        if (handle_initialized_client(pfds[i].fd, conn, &nbytes_read) == STATUS_ERROR)
                         {
-                            fprintf(stderr, "%s:%s:%d - illegal message type received from client\n", __FILE__, __FUNCTION__, __LINE__);
-                            if (send_invalid_request_response(pfds[i].fd)  == STATUS_ERROR)
-                            {
-                                fprintf(stderr, "send_invalid_request_response() failed\n");
-                                exit(1);
-                            }
-                            // reset header cursor for client connection
-                            conn->header_cursor = conn->header;
-                            continue;
-                        }
-
-                        // parse data length and allocate buffer for request data
-                        uint32_t data_len = ntohl(*(uint32_t *)(conn->header + sizeof(proto_msg)));
-
-                        // check special case to see if client has sent empty request
-                        if (data_len == 0)
-                        {
-                            // client has sent empty request
-                            printf("client sent empty request\n");
-                            if (send_empty_response(pfds[i].fd) == STATUS_ERROR)
-                            {
-                                fprintf(stderr, "%s:%s:%d - unable to send empty response to client\n", __FILE__, __FUNCTION__, __LINE__);
-                                exit(1);
-                            }
-
-                            // reset header cursor of connection, in case client makes new request
-                            conn->header_cursor = conn->header;
-                            continue;
-                        }
-
-                        conn->buf = malloc(data_len);
-                        conn->buf_cursor = conn->buf;
-                        conn->buf_size = (size_t) data_len;
-
-                        // transition state of connection
-                        conn->state = REQUEST;
-
-                        // attempt to read any remaining bytes from client's socket just in case more were able to get through
-                        // reset 'nbytes_read' to zero to keep track of bytes read from the request
-                        nbytes_read = 0;
-                        if ((nbytes_read = receive_from_client(pfds[i].fd, conn)) == STATUS_ERROR)
-                        {
-                            fprintf(stderr, "receive_from_client() failed\n");
+                            fprintf(stderr, "handle_initialized_client() failed\n");
                             exit(1);
                         }
                     }
@@ -666,6 +623,62 @@ int handle_uninitialized_client(int client_fd, client_connection *conn, uint16_t
            fprintf(stderr, "send_handshake_response() failed\n");
            return STATUS_ERROR;
        }
+    }
+    return STATUS_SUCCESS;
+}
+
+int handle_initialized_client(int client_fd, client_connection *conn, int *nbytes_read)
+{
+    // parse message type 
+    proto_msg msg_type = *(proto_msg *)(conn->header);
+    if (msg_type != DB_ACCESS_REQUEST)
+    {
+        fprintf(stderr, "%s:%s:%d - illegal message type received from client\n", __FILE__, __FUNCTION__, __LINE__);
+        if (send_invalid_request_response(client_fd)  == STATUS_ERROR)
+        {
+            fprintf(stderr, "%s:%s:%d - send_invalid_request_response() failed\n", __FILE__, __FUNCTION__, __LINE__);
+            return STATUS_ERROR;
+        }
+        // reset header cursor for client connection
+        conn->header_cursor = conn->header;
+    }
+    else
+    {
+        // parse data length and allocate buffer for request data
+        uint32_t data_len = ntohl(*(uint32_t *)(conn->header + sizeof(proto_msg)));
+
+        // check special case to see if client has sent empty request
+        if (data_len == 0)
+        {
+            // client has sent empty request
+            printf("client sent empty request\n");
+            if (send_empty_response(client_fd) == STATUS_ERROR)
+            {
+                fprintf(stderr, "%s:%s:%d - unable to send empty response to client\n", __FILE__, __FUNCTION__, __LINE__);
+                return STATUS_ERROR;
+            }
+
+            // reset header cursor of connection, in case client makes new request
+            conn->header_cursor = conn->header;
+        }
+        else
+        {
+            conn->buf = malloc(data_len);
+            conn->buf_cursor = conn->buf;
+            conn->buf_size = (size_t) data_len;
+
+            // transition state of connection
+            conn->state = REQUEST;
+
+            // attempt to read any remaining bytes from client's socket just in case more were able to get through
+            // reset 'nbytes_read' to zero to keep track of bytes read from the request
+            *nbytes_read = 0;
+            if ((*nbytes_read = receive_from_client(client_fd, conn)) == STATUS_ERROR)
+            {
+                fprintf(stderr, "receive_from_client() failed\n");
+                return STATUS_ERROR;
+            }
+        }
     }
     return STATUS_SUCCESS;
 }
