@@ -33,6 +33,7 @@ int send_handshake_response(int client_fd, unsigned char flag);
 int send_invalid_request_response(int client_fd);
 int send_empty_response(int client_fd);
 int accept_new_client(int listener, struct pollfd **pfds, size_t *fd_count, nfds_t *fd_size, connection_map *m);
+int handle_client_disconnect(struct pollfd **pfds, size_t *fd_count, nfds_t *fd_size, connection_map *client_connections, client_connection *conn);
 
 int main(int argc, char *argv[])
 {
@@ -215,16 +216,21 @@ int main(int argc, char *argv[])
                     if (nbytes_read == 0)
                     {
                         // client's connection has terminated
-                        printf("client disconnected\n");
-                        size_t conn_idx = conn->conn_idx;
-                        free_client_connection(conn);
-                        if (remove_fd(pfds, &fd_count, &client_connections, conn_idx) == STATUS_ERROR)
+                        if (handle_client_disconnect(&pfds, &fd_count, &fd_size, &client_connections, conn) == STATUS_ERROR) 
                         {
-                            fprintf(stderr, "remove_fd() failed\n");
+                            fprintf(stderr, "handle_client_disconnect() failed\n");
                             exit(1);
                         }
+                        //printf("client disconnected\n");
+                        //size_t conn_idx = conn->conn_idx;
+                        //free_client_connection(conn);
+                        //if (remove_fd(pfds, &fd_count, &client_connections, conn_idx) == STATUS_ERROR)
+                        //{
+                        //    fprintf(stderr, "remove_fd() failed\n");
+                        //    exit(1);
+                        //}
 
-                        connection_map_remove(&client_connections, pfds[i].fd);
+                        //connection_map_remove(&client_connections, pfds[i].fd);
                         continue;
                     }
                     else if (conn->state == UNINITIALIZED && nbytes_read == sizeof(proto_msg) + sizeof(uint16_t))
@@ -643,6 +649,23 @@ int accept_new_client(int listener, struct pollfd **pfds, size_t *fd_count, nfds
         connection_map_insert(m, client_fd, client_conn);
     }
 
+    return STATUS_SUCCESS;
+}
+
+int handle_client_disconnect(struct pollfd **pfds, size_t *fd_count, nfds_t *fd_size, connection_map *client_connections, client_connection *conn)
+{
+    // client's connection has terminated
+    printf("client disconnected\n");
+    size_t conn_idx = conn->conn_idx;
+    int client_fd = (*pfds)[conn_idx].fd;
+    free_client_connection(conn);
+    if (remove_fd(*pfds, fd_count, client_connections, conn_idx) == STATUS_ERROR)
+    {
+        fprintf(stderr, "%s:%s:%d - remove_fd() failed\n", __FILE__, __FUNCTION__, __LINE__);
+        return STATUS_ERROR;
+    }
+
+    connection_map_remove(client_connections, client_fd);
     return STATUS_SUCCESS;
 }
 
