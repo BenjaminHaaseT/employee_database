@@ -18,6 +18,7 @@
 void print_usage(char **argv);
 int send_handshake(int socket, uint16_t protocol_version);
 void decode_request_error(unsigned char error_flag);
+int get_socket(char *host, char *port);
 
 
 int main(int argc, char *argv[])
@@ -92,45 +93,14 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-	// get info for host/port
-    int status;
-    struct addrinfo hints = {0}; 
-    hints.ai_family = AF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM;
-
-    struct addrinfo *servinfo;
-    if ((status = getaddrinfo(host, port, &hints, &servinfo)) == -1)
-    {
-        fprintf(stderr, "getaddrinfo() failed: (%d) %s\n", status, gai_strerror(status));
-        exit(1);
-    }
-        
-	// attempt to create a socket from the given server
+    // get socket for server
     int sockfd;
-    struct addrinfo *ptr; 
-    for (ptr = servinfo; ptr; ptr = ptr->ai_next)
+    if ((sockfd = get_socket(host, port)) == STATUS_ERROR)
     {
-        if ((sockfd = socket(ptr->ai_family, ptr->ai_socktype, ptr->ai_protocol)) == -1)
-            continue;
-        break;
-    }
-
-    // validate socket
-    if (sockfd == -1 || !ptr)
-    {
-        fprintf(stderr, "unable to create socket: %s\n", strerror(errno));
+        fprintf(stderr, "get_socket() failed\n");
         exit(1);
     }
 
-	// connect to socket and ensure connection has been established
-    if (connect(sockfd, ptr->ai_addr, ptr->ai_addrlen) == -1)
-    {
-        fprintf(stderr, "unable to connect to host: %s\n", strerror(errno));
-        exit(1);
-    }
-    
-    freeaddrinfo(servinfo);
-    
     // serialize/send handshake request
     if (send_handshake(sockfd, parsed_protocol_version) == STATUS_ERROR)
     {
@@ -352,4 +322,48 @@ void decode_request_error(unsigned char error_flag)
             printf("unknown error occurred\n");
     }
 }
+
+int get_socket(char *host, char *port)
+{
+	// get info for host/port
+    int status;
+    struct addrinfo hints = {0}; 
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+
+    struct addrinfo *servinfo;
+    if ((status = getaddrinfo(host, port, &hints, &servinfo)) == -1)
+    {
+        fprintf(stderr, "%s:%s:%d - getaddrinfo() failed: (%d) %s\n", __FILE__, __FUNCTION__, __LINE__, status, gai_strerror(status));
+        return STATUS_ERROR;
+    }
+        
+	// attempt to create a socket from the given server
+    int sockfd;
+    struct addrinfo *ptr; 
+    for (ptr = servinfo; ptr; ptr = ptr->ai_next)
+    {
+        if ((sockfd = socket(ptr->ai_family, ptr->ai_socktype, ptr->ai_protocol)) == -1)
+            continue;
+        break;
+    }
+
+    // validate socket
+    if (sockfd == -1 || !ptr)
+    {
+        fprintf(stderr, "%s:%s:%d - unable to create socket: %s\n", __FILE__, __FUNCTION__, __LINE__, strerror(errno));
+        return STATUS_ERROR;
+    }
+
+	// connect to socket and ensure connection has been established
+    if (connect(sockfd, ptr->ai_addr, ptr->ai_addrlen) == -1)
+    {
+        fprintf(stderr, "%s:%s:%d - unable to connect to host: %s\n", __FILE__, __FUNCTION__, __LINE__, strerror(errno));
+        return STATUS_ERROR;
+    }
+    
+    freeaddrinfo(servinfo);
+    return sockfd;
+}
+
             
