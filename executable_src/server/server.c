@@ -36,6 +36,7 @@ int accept_new_client(int listener, struct pollfd **pfds, size_t *fd_count, nfds
 int handle_client_disconnect(struct pollfd **pfds, size_t *fd_count, nfds_t *fd_size, connection_map *client_connections, client_connection *conn);
 int handle_uninitialized_client(int client_fd, client_connection *conn, uint16_t protocol_version);
 int handle_initialized_client(int client_fd, client_connection *conn, int *nbytes_read);
+int handle_db_access_request(int dbfd, employee **employees, db_header *dbhdr, client_connection *conn, int client_fd);
 
 int main(int argc, char *argv[])
 {
@@ -245,32 +246,11 @@ int main(int argc, char *argv[])
                     // Check if connection has been transistioned/or is in, request state and all bytes of request have been read successfully
                     if (conn->state == REQUEST && nbytes_read == conn->buf_size)
                     {
-                        // once this state is reached process request and reset state of connection
-                        // allocate buffer for response to client
-                        size_t response_buf_size = sizeof(proto_msg) + sizeof(uint32_t) + 1;
-                        unsigned char *response_buf = malloc(response_buf_size);
-                        *(proto_msg *)(response_buf) = DB_ACCESS_RESPONSE;
-
-                        // process request and write to response buffer depending on options requested
-                        if (deserialize_request_options(fd, &employees, &dbhdr, &response_buf, &response_buf_size, conn) == STATUS_ERROR)
+                        if (handle_db_access_request(fd, &employees, &dbhdr, conn, pfds[i].fd) == STATUS_ERROR)
                         {
-                            fprintf(stderr, "deserialize_request_options() failed\n");
+                            fprintf(stderr, "handle_db_access_request() failed\n");
                             exit(1);
                         }
-
-                        // send response back to client
-                        if (send_all(pfds[i].fd, response_buf, response_buf_size, 0) == STATUS_ERROR)
-                        {
-                            fprintf(stderr, "send_all() failed\n");
-                            exit(1);
-                        }
-
-                        // reset client, reset header and buf cursor's and state to initialized
-                        conn->state = INITIALIZED;
-                        conn->header_cursor = conn->header;
-                        free(conn->buf);
-                        conn->buf = NULL;
-                        conn->buf_cursor = NULL;
                     }
                 }
             }   // check for pollin flag being set
@@ -682,4 +662,36 @@ int handle_initialized_client(int client_fd, client_connection *conn, int *nbyte
     }
     return STATUS_SUCCESS;
 }
+
+int handle_db_access_request(int dbfd, employee **employees, db_header *dbhdr, client_connection *conn, int client_fd)
+{
+    // once this state is reached process request and reset state of connection
+    // allocate buffer for response to client
+    size_t response_buf_size = sizeof(proto_msg) + sizeof(uint32_t) + 1;
+    unsigned char *response_buf = malloc(response_buf_size);
+    *(proto_msg *)(response_buf) = DB_ACCESS_RESPONSE;
+
+    // process request and write to response buffer depending on options requested
+    if (deserialize_request_options(dbfd, employees, dbhdr, &response_buf, &response_buf_size, conn) == STATUS_ERROR)
+    {
+        fprintf(stderr, "%s:%s:%d - deserialize_request_options() failed\n", __FILE__, __FUNCTION__, __LINE__);
+        return STATUS_ERROR;
+    }
+
+    // send response back to client
+    if (send_all(client_fd, response_buf, response_buf_size, 0) == STATUS_ERROR)
+    {
+        fprintf(stderr, "%s:%s:%d - send_all() failed\n", __FILE__, __FUNCTION__, __LINE__);
+        return STATUS_ERROR;
+    }
+
+    // reset client, reset header and buf cursor's and state to initialized
+    conn->state = INITIALIZED;
+    conn->header_cursor = conn->header;
+    free(conn->buf);
+    conn->buf = NULL;
+    conn->buf_cursor = NULL;
+    return STATUS_SUCCESS;
+}
+
 
