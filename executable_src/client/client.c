@@ -18,6 +18,7 @@
 void print_usage(char **argv);
 int send_handshake(int socket, uint16_t protocol_version);
 int receive_handshake(int socket);
+int deserialize_response(int socket);
 void decode_request_error(unsigned char error_flag);
 int get_socket(char *host, char *port);
 
@@ -109,6 +110,7 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
+    // receive handshake response from server
     if (receive_handshake(sockfd) == STATUS_ERROR)
     {
         fprintf(stderr, "receive_handshake() failed\n");
@@ -119,6 +121,7 @@ int main(int argc, char *argv[])
      size_t header_size = sizeof(proto_msg) + sizeof(uint32_t);
      size_t capacity = header_size;
      unsigned char *buf = malloc(capacity);
+
      // write message type to buffer
      *((proto_msg *)buf) = DB_ACCESS_REQUEST;
      unsigned char *cursor = buf + capacity;
@@ -183,68 +186,74 @@ int main(int argc, char *argv[])
     // free request buffer
     free(buf);
 
+    if (deserialize_response(sockfd) == STATUS_ERROR)
+    {
+        fprintf(stderr, "deserialize_response() failed\n");
+        exit(1);
+    }
+
 	// de-serialize and parse response
-    size_t response_header_size = sizeof(proto_msg) + sizeof(uint32_t) + 1;
-    unsigned char *response_header = malloc(response_header_size);
+    //size_t response_header_size = sizeof(proto_msg) + sizeof(uint32_t) + 1;
+    //unsigned char *response_header = malloc(response_header_size);
 
-    if (receive_all(sockfd, response_header, response_header_size, 0) == STATUS_ERROR)
-    {
-        fprintf(stderr, "unable to receive response from server\n");
-        exit(1);
-    }
+    //if (receive_all(sockfd, response_header, response_header_size, 0) == STATUS_ERROR)
+    //{
+    //    fprintf(stderr, "unable to receive response from server\n");
+    //    exit(1);
+    //}
 
-    // check response type in header
-    proto_msg response_type = *(proto_msg *)response_header;
-    if (response_type == INVALID_REQUEST)
-    {
-        fprintf(stderr, "invalid request\n");
-        exit(1);
-    }
+    //// check response type in header
+    //proto_msg response_type = *(proto_msg *)response_header;
+    //if (response_type == INVALID_REQUEST)
+    //{
+    //    fprintf(stderr, "invalid request\n");
+    //    exit(1);
+    //}
 
-    // check for errors in response
-    unsigned char error_flag = *(response_header + sizeof(proto_msg));
-    if (error_flag)
-    {
-        fprintf(stderr, "request error\n");
-        decode_request_error(error_flag);
-        exit(1);
-    }
+    //// check for errors in response
+    //unsigned char error_flag = *(response_header + sizeof(proto_msg));
+    //if (error_flag)
+    //{
+    //    fprintf(stderr, "request error\n");
+    //    decode_request_error(error_flag);
+    //    exit(1);
+    //}
 
-    // parse length of response
-    data_len = ntohl(*((uint32_t *)(response_header + sizeof(proto_msg) + 1)));
-    free(response_header);
-    if (data_len > 0)
-    {
-        // allocate for receiving serialized employees
-        unsigned char *serialized_employees = malloc(data_len);
+    //// parse length of response
+    //data_len = ntohl(*((uint32_t *)(response_header + sizeof(proto_msg) + 1)));
+    //free(response_header);
+    //if (data_len > 0)
+    //{
+    //    // allocate for receiving serialized employees
+    //    unsigned char *serialized_employees = malloc(data_len);
 
-        // read bytes sent from server
-        if (receive_all(sockfd, serialized_employees, data_len, 0) == STATUS_ERROR)
-        {
-            fprintf(stderr, "unable to receive serialized data from server\n");
-            exit(1);
-        }
+    //    // read bytes sent from server
+    //    if (receive_all(sockfd, serialized_employees, data_len, 0) == STATUS_ERROR)
+    //    {
+    //        fprintf(stderr, "unable to receive serialized data from server\n");
+    //        exit(1);
+    //    }
 
-        // for deserializing received employee bytes
-        employee *employees;
-        size_t employees_size;
-        if (deserialize_list_employee_response(serialized_employees, data_len, &employees, &employees_size) == STATUS_ERROR)
-        {
-            fprintf(stderr, "unable to deserialize employees from raw bytes\n");
-            exit(1);
-        }
+    //    // for deserializing received employee bytes
+    //    employee *employees;
+    //    size_t employees_size;
+    //    if (deserialize_list_employee_response(serialized_employees, data_len, &employees, &employees_size) == STATUS_ERROR)
+    //    {
+    //        fprintf(stderr, "unable to deserialize employees from raw bytes\n");
+    //        exit(1);
+    //    }
 
-        free(serialized_employees);
+    //    free(serialized_employees);
 
-        // display employees
-        for (size_t i = 0; i < employees_size; i++)
-        {
-            printf("%s, %s, %u", employees[i].name, employees[i].address, employees[i].hours);
-            printf("\n");
-        }
+    //    // display employees
+    //    for (size_t i = 0; i < employees_size; i++)
+    //    {
+    //        printf("%s, %s, %u", employees[i].name, employees[i].address, employees[i].hours);
+    //        printf("\n");
+    //    }
 
-        free(employees);
-    }
+    //    free(employees);
+    //}
 
     if (close(sockfd) == -1)
     {
@@ -374,6 +383,75 @@ int receive_handshake(int socket)
     }
 
     free(handshake_response);
+    return STATUS_SUCCESS;
+}
+
+int deserialize_response(int socket)
+{
+	// de-serialize and parse response
+    size_t response_header_size = sizeof(proto_msg) + sizeof(uint32_t) + 1;
+    unsigned char *response_header = malloc(response_header_size);
+
+    if (receive_all(socket, response_header, response_header_size, 0) == STATUS_ERROR)
+    {
+        fprintf(stderr, "%s:%s:%d - unable to receive response from server\n", __FILE__, __FUNCTION__, __LINE__);
+        return STATUS_ERROR;
+    }
+
+    // check response type in header
+    proto_msg response_type = *(proto_msg *)response_header;
+    if (response_type == INVALID_REQUEST)
+    {
+        fprintf(stderr, "%s:%s:%d - invalid request\n", __FILE__, __FUNCTION__, __LINE__);
+        return STATUS_ERROR;
+    }
+
+    // check for errors in response
+    unsigned char error_flag = *(response_header + sizeof(proto_msg));
+    if (error_flag)
+    {
+        fprintf(stderr, "request error\n");
+        decode_request_error(error_flag);
+        return STATUS_ERROR;
+    }
+
+    // parse length of response
+    uint32_t data_len = ntohl(*((uint32_t *)(response_header + sizeof(proto_msg) + 1)));
+    free(response_header);
+
+    if (data_len > 0)
+    {
+        // allocate for receiving serialized employees
+        unsigned char *serialized_employees = malloc(data_len);
+
+        // read bytes sent from server
+        if (receive_all(socket, serialized_employees, data_len, 0) == STATUS_ERROR)
+        {
+            fprintf(stderr, "%s:%s:%d - unable to receive serialized data from server\n", __FILE__, __FUNCTION__, __LINE__);
+            return STATUS_ERROR;
+        }
+
+        // for deserializing received employee bytes
+        employee *employees;
+        size_t employees_size;
+        if (deserialize_list_employee_response(serialized_employees, data_len, &employees, &employees_size) == STATUS_ERROR)
+        {
+            fprintf(stderr, "%s:%s:%d - unable to deserialize employees from raw bytes\n", __FILE__, __FUNCTION__, __LINE__);
+            return STATUS_ERROR;
+        }
+
+        free(serialized_employees);
+
+        // display employees
+        for (size_t i = 0; i < employees_size; i++)
+        {
+            printf("%s, %s, %u", employees[i].name, employees[i].address, employees[i].hours);
+            printf("\n");
+        }
+
+        free(employees);
+    }
+
     return STATUS_SUCCESS;
 }
 
