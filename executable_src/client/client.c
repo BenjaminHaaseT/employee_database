@@ -17,6 +17,7 @@
 
 void print_usage(char **argv);
 int send_handshake(int socket, uint16_t protocol_version);
+int receive_handshake(int socket);
 void decode_request_error(unsigned char error_flag);
 int get_socket(char *host, char *port);
 
@@ -108,35 +109,11 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-    // wait for handshake response from server, confirm protocol versions match
-    unsigned char *handshake_response = malloc(sizeof(proto_msg));
-    if (receive_all(sockfd, handshake_response, sizeof(proto_msg), 0) == STATUS_ERROR)
+    if (receive_handshake(sockfd) == STATUS_ERROR)
     {
-        fprintf(stderr, "unable to receive handshake response\n");
+        fprintf(stderr, "receive_handshake() failed\n");
         exit(1);
     }
-
-    if (*(proto_msg *)handshake_response != HANDSHAKE_RESPONSE)
-    {
-        fprintf(stderr, "internal server error\n");
-        exit(1);
-    }
-
-    unsigned char handshake_flag;
-
-    if (receive_all(sockfd, &handshake_flag, 1, 0) == STATUS_ERROR)
-    {
-        fprintf(stderr, "unable to receive handshake response\n");
-        exit(1);
-    }
-
-    if (handshake_flag)
-    {
-        fprintf(stderr, "invalid protocol version\n");
-        exit(1);
-    }
-
-    free(handshake_response);
 
     // create buffer and cursor for serializing request
      size_t header_size = sizeof(proto_msg) + sizeof(uint32_t);
@@ -365,5 +342,40 @@ int get_socket(char *host, char *port)
     freeaddrinfo(servinfo);
     return sockfd;
 }
+
+int receive_handshake(int socket)
+{
+    // wait for handshake response from server, confirming protocol versions match
+    unsigned char *handshake_response = malloc(sizeof(proto_msg));
+    if (receive_all(socket, handshake_response, sizeof(proto_msg), 0) == STATUS_ERROR)
+    {
+        fprintf(stderr, "%s:%s:%d - unable to receive handshake response\n", __FILE__, __FUNCTION__, __LINE__);
+        return STATUS_ERROR;
+    }
+
+    if (*(proto_msg *)handshake_response != HANDSHAKE_RESPONSE)
+    {
+        fprintf(stderr, "%s:%s:%d - internal server error\n", __FILE__, __FUNCTION__, __LINE__);
+        return STATUS_ERROR;
+    }
+
+    unsigned char handshake_flag;
+
+    if (receive_all(socket, &handshake_flag, 1, 0) == STATUS_ERROR)
+    {
+        fprintf(stderr, "%s:%s:%d - unable to receive handshake response\n", __FILE__, __FUNCTION__, __LINE__);
+        return STATUS_ERROR;
+    }
+
+    if (handshake_flag)
+    {
+        fprintf(stderr, "%s:%s:%d - invalid protocol version\n", __FILE__, __FUNCTION__, __LINE__);
+        return STATUS_ERROR;
+    }
+
+    free(handshake_response);
+    return STATUS_SUCCESS;
+}
+
 
             
